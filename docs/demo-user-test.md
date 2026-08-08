@@ -10,8 +10,20 @@ build it tries to get something done.
 
 ## Starting it
 
-The quickest way to get a URL somebody else can open is a Codespace on this
-repository — it installs nothing on your machine and gives the running system
+**If all you want is a link somebody can click:** `system.html` on the
+published pages —
+<https://sovanna2011.github.io/SugarProductionPlanning/system.html> — is the
+system running in the browser, with the same accounts, the same roles, the same
+capacity rules and the same season plan. Nothing to install, nothing to start,
+works on a phone. Its limit is that it has no server: each person gets their
+own copy, so it cannot show two people working on the same data, and nothing
+anybody does is recorded anywhere you can read afterwards. For a first
+walk-through with one person at a time it is enough, and it is by far the
+fastest thing to hand somebody.
+
+**For anything involving more than one person**, or where you want to look at
+what was posted afterwards, run the real system. The quickest way to get a URL
+somebody else can open is a Codespace on this repository — it installs nothing on your machine and gives the running system
 an HTTPS address:
 
 <https://codespaces.new/Sovanna2011/SugarProductionPlanning>
@@ -87,17 +99,41 @@ they hesitate is the finding; what they say afterwards is commentary.
 10. Add a new packaging size and give a warehouse a ceiling for it.
 11. Change the alert bands so "nearly full" means something the factory agrees
     with.
-12. Try to post a stock receipt. *(Should be refused.)*
+12. Open the daily production plan and change one day — say, raise quota sales
+    for 16 Feb 2027. **Then say what it did to the date the finished sugar
+    warehouses overflow.** *(It should move: the pool figures follow from the
+    production figures, so a change to one is a change to the other. If the
+    person cannot tell that anything happened, the screen has failed.)*
+13. Work out how much has to be sold each day for the season to end inside
+    capacity. *(About 640 t/day holds the closing stock under 69,000 t; about
+    890 t/day clears the whole season's production. Do they arrive at
+    something near that, and how?)*
+14. Try to post a stock receipt. *(Should be refused.)*
 
 ### As `admin`
 
-13. Create an account for a real colleague with the right roles, and read out
+15. Create an account for a real colleague with the right roles, and read out
     the password it generates.
-14. Reset somebody's password and sign them out everywhere.
-15. Force a posting that capacity validation blocked, giving a reason. Then
+16. Reset somebody's password and sign them out everywhere.
+17. Force a posting that capacity validation blocked, giving a reason. Then
     find that reason again afterwards.
-16. Try to remove your own administrator role. *(Should be refused if you are
+18. Try to remove your own administrator role. *(Should be refused if you are
     the last one — is the reason clear?)*
+
+### Which of these the browser-only page cannot do
+
+Tasks 1–9, 12–14 and 18 work in `system.html`. The rest need the real system:
+
+- **10** — adding a packaging size. The browser page shows the packaging master
+  and every ceiling, but only storage locations are editable in it.
+- **11** — changing the alert bands.
+- **16** — resetting a password and signing somebody out everywhere. One
+  browser holds one session, so there is nowhere else to sign out of.
+- **15** works, except that you type the new password rather than being given a
+  generated one.
+- **17** works, but the reason is only findable again in that same browser.
+
+If a session is going to cover those, run the real system for it.
 
 ## What to write down
 

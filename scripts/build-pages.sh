@@ -22,6 +22,7 @@ cp demo/*.html "$OUT/"
 # --- link the pages to each other -------------------------------------------
 
 sed -i \
+  -e 's|https://claude.ai/code/artifact/3c194f3b-219d-4278-88e9-82d7b7a56088|system.html|g' \
   -e 's|https://claude.ai/code/artifact/af8ca334-a6e4-4836-885d-afd507e614c4|login.html|g' \
   -e 's|https://claude.ai/code/artifact/ace6edcf-3d65-4546-8d0f-8816bd1682ef|storage-capacity-console.html|g' \
   -e 's|https://claude.ai/code/artifact/1102d3c9-4851-4002-bc1a-de948174722f|login-and-roles.html|g' \
@@ -48,6 +49,7 @@ HEAD = """<!doctype html>
 # as an artifact, inline, so the tab is recognisable and nothing 404s.
 FAVICONS = {
     "index.html": "\U0001F3ED",
+    "system.html": "\U0001F3ED",
     "login.html": "\U0001F511",
     "login-and-roles.html": "\U0001F510",
     "storage-capacity-console.html": "\U0001F4CA",

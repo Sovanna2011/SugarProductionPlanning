@@ -65,16 +65,31 @@ docs/                    Data model, plan analysis, source documents
 
 ### The demo system
 
-**Nothing at all to install or sign in to:** the demo pages are published at
+**Nothing at all to install:** the demo pages are published at
 
   <https://sovanna2011.github.io/SugarProductionPlanning/>
 
-including a sign-in flow you can click through. It is a faithful reproduction
-driven by responses captured from the running system, not the system itself —
-that needs a server and a database, which the two routes below provide.
+`system.html` there is a working system that runs entirely in the browser. Sign
+in as any of the five accounts and it behaves like the real one: what each role
+may and may not do, the storage position, editing the storage master data,
+editing the daily production plan — which moves the storage curves with it —
+and posting a movement, including one the capacity rules refuse and the
+sentence they refuse it with.
+
+It is not a mock-up. The master data, the capacity rules and all 276 days of
+the season plan are the real ones: `scripts/extract_seed_data.py` reads them
+out of `backend/migrations` and `scripts/build-demo-system.py` inlines them, so
+the page cannot drift from the system it stands for. What it does not have is a
+server or a database, so nothing you do in it is shared with anybody else. For
+that, use one of the two routes below.
 
 *(Publishing needs GitHub Pages switched on once: **Settings → Pages → Source →
 GitHub Actions**. The workflow says so in its run summary until it is.)*
+
+```
+python3 scripts/build-demo-system.py    # rebuild demo/system.html
+./scripts/build-pages.sh build/pages    # build the whole site locally
+```
 
 **The real system, on a public link, one click:** open the repository in
 GitHub Codespaces.

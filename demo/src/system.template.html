@@ -1,0 +1,1868 @@
+<title>Sugar Production Planning — sign in and use it</title>
+<style>
+/* ---------------------------------------------------------------------------
+   Fonts are inlined because the page has to work from a file:// URL, from
+   GitHub Pages and from the artifact host, and two of those forbid fetching
+   anything from another origin.
+   --------------------------------------------------------------------------- */
+/*{{FONTS}}*/
+
+/* ---------------------------------------------------------------------------
+   Tokens.
+
+   The accent is cool on purpose. Everything this system has to say about
+   storage it says with a warm ramp — green, amber, orange, red — so an accent
+   anywhere in that range would read as a severity. Keeping the chrome teal
+   leaves the whole warm half of the wheel meaning exactly one thing.
+   --------------------------------------------------------------------------- */
+:root {
+  --ground:      #F6F3ED;
+  --surface:     #FFFFFF;
+  --surface-2:   #EFEAE1;
+  --line:        #DFD7C9;
+  --line-strong: #C6BCAA;
+  --ink:         #201A13;
+  --ink-2:       #4A4034;
+  --muted:       #736855;
+  --accent:      #0D555E;
+  --accent-ink:  #FFFFFF;
+  --accent-soft: #E0EDEE;
+  --rail:        #1B2628;
+  --rail-ink:    #CFD8D7;
+  --rail-muted:  #7F9291;
+  --rail-line:   #2E3C3E;
+
+  --ok:    #2C7A4B;
+  --warn:  #A87908;
+  --high:  #BC5518;
+  --crit:  #A81F1F;
+  --full:  #74100F;
+  --ok-bg:   #E4F1E7;
+  --warn-bg: #F8EDD2;
+  --high-bg: #F9E4D6;
+  --crit-bg: #F7DDDC;
+  --full-bg: #EFCFCD;
+
+  --radius: 4px;
+  --shadow: 0 1px 2px rgba(32, 26, 19, .07), 0 6px 18px rgba(32, 26, 19, .05);
+
+  --display: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+  --body: "IBM Plex Sans", -apple-system, "Segoe UI", Roboto, sans-serif;
+  --data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:      #14110D;
+    --surface:     #1C1813;
+    --surface-2:   #241F18;
+    --line:        #362F25;
+    --line-strong: #4B4234;
+    --ink:         #EFE9DE;
+    --ink-2:       #C7BEAF;
+    --muted:       #9B907E;
+    --accent:      #58B6C0;
+    --accent-ink:  #0B2124;
+    --accent-soft: #123236;
+    --rail:        #0E0C09;
+    --rail-ink:    #D6DEDD;
+    --rail-muted:  #7D8D8C;
+    --rail-line:   #232D2E;
+
+    --ok:    #63C48C;
+    --warn:  #DCA83A;
+    --high:  #EE8B4C;
+    --crit:  #EE6E6E;
+    --full:  #D45252;
+    --ok-bg:   #12301F;
+    --warn-bg: #33290C;
+    --high-bg: #38230F;
+    --crit-bg: #3A1918;
+    --full-bg: #451A19;
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 8px 24px rgba(0, 0, 0, .35);
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground:      #14110D;
+  --surface:     #1C1813;
+  --surface-2:   #241F18;
+  --line:        #362F25;
+  --line-strong: #4B4234;
+  --ink:         #EFE9DE;
+  --ink-2:       #C7BEAF;
+  --muted:       #9B907E;
+  --accent:      #58B6C0;
+  --accent-ink:  #0B2124;
+  --accent-soft: #123236;
+  --rail:        #0E0C09;
+  --rail-ink:    #D6DEDD;
+  --rail-muted:  #7D8D8C;
+  --rail-line:   #232D2E;
+
+  --ok:    #63C48C;
+  --warn:  #DCA83A;
+  --high:  #EE8B4C;
+  --crit:  #EE6E6E;
+  --full:  #D45252;
+  --ok-bg:   #12301F;
+  --warn-bg: #33290C;
+  --high-bg: #38230F;
+  --crit-bg: #3A1918;
+  --full-bg: #451A19;
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 8px 24px rgba(0, 0, 0, .35);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font: 400 15px/1.55 var(--body);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { font-family: var(--display); font-weight: 600; text-wrap: balance; margin: 0; }
+h1 { font-size: 1.7rem; letter-spacing: -.01em; }
+h2 { font-size: 1.15rem; }
+h3 { font-size: .98rem; }
+p { margin: 0 0 .7em; }
+a { color: var(--accent); }
+
+.num { font-family: var(--data); font-weight: 500; font-variant-numeric: tabular-nums; }
+.eyebrow {
+  font-size: .69rem; letter-spacing: .11em; text-transform: uppercase;
+  color: var(--muted); font-weight: 600;
+}
+[hidden] { display: none !important; }
+
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* --- controls -------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex; align-items: center; gap: .45em;
+  padding: .48em 1em; border-radius: var(--radius); cursor: pointer;
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink);
+  font-weight: 500; font-size: .92rem;
+}
+.btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover:not(:disabled) { filter: brightness(1.1); color: var(--accent-ink); }
+.btn.small { padding: .3em .7em; font-size: .82rem; }
+
+label.field { display: flex; flex-direction: column; gap: .3em; font-size: .82rem; color: var(--muted); }
+label.field > span { font-weight: 500; }
+input[type=text], input[type=password], input[type=number], input[type=date], select, textarea {
+  padding: .5em .6em; border: 1px solid var(--line-strong); border-radius: var(--radius);
+  background: var(--surface); color: var(--ink); font-size: .95rem; width: 100%;
+}
+input:disabled, select:disabled { background: var(--surface-2); color: var(--muted); }
+textarea { resize: vertical; min-height: 3.4em; }
+
+/* --- severity -------------------------------------------------------------- */
+
+.chip {
+  display: inline-block; padding: .12em .55em; border-radius: 999px;
+  font-size: .72rem; font-weight: 600; letter-spacing: .02em; white-space: nowrap;
+}
+.chip.NORMAL   { background: var(--ok-bg);   color: var(--ok); }
+.chip.WARNING  { background: var(--warn-bg); color: var(--warn); }
+.chip.HIGH     { background: var(--high-bg); color: var(--high); }
+.chip.CRITICAL { background: var(--crit-bg); color: var(--crit); }
+.chip.FULL     { background: var(--full-bg); color: var(--full); }
+.chip.role     { background: var(--accent-soft); color: var(--accent); font-family: var(--data); }
+.chip.off      { background: var(--surface-2); color: var(--muted); }
+
+.bar { height: 7px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.bar > i { display: block; height: 100%; border-radius: 999px; }
+.bar > i.NORMAL   { background: var(--ok); }
+.bar > i.WARNING  { background: var(--warn); }
+.bar > i.HIGH     { background: var(--high); }
+.bar > i.CRITICAL { background: var(--crit); }
+.bar > i.FULL     { background: var(--full); }
+
+/* --- sign in --------------------------------------------------------------- */
+
+#login { min-height: 100vh; display: grid; grid-template-columns: 1.05fr .95fr; }
+#login .plate {
+  background: var(--rail); color: var(--rail-ink);
+  padding: 3rem clamp(1.5rem, 4vw, 3.6rem);
+  display: flex; flex-direction: column; justify-content: center; gap: 1.4rem;
+}
+#login .plate h1 { color: #fff; font-size: clamp(1.6rem, 3vw, 2.3rem); }
+#login .plate .eyebrow { color: var(--rail-muted); }
+#login .plate p { color: var(--rail-muted); max-width: 46ch; font-size: .92rem; }
+#login .plate .num { color: #fff; }
+#chartwrap { border: 1px solid var(--rail-line); border-radius: var(--radius); padding: .9rem; background: #0000001f; }
+#chartwrap figcaption { font-size: .76rem; color: var(--rail-muted); margin-top: .5rem; }
+#chart { width: 100%; height: 190px; display: block; }
+
+#login .panel {
+  background: var(--ground); padding: 3rem clamp(1.5rem, 4vw, 3.2rem);
+  display: flex; flex-direction: column; justify-content: center; gap: 1.3rem;
+}
+.card {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+}
+#signin { padding: 1.5rem; display: flex; flex-direction: column; gap: .9rem; max-width: 27rem; }
+#signin .row { display: flex; gap: .7rem; align-items: center; }
+.msg { padding: .6em .8em; border-radius: var(--radius); font-size: .87rem; border: 1px solid; }
+.msg.bad  { background: var(--crit-bg); color: var(--crit); border-color: color-mix(in srgb, var(--crit) 35%, transparent); }
+.msg.warn { background: var(--warn-bg); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 35%, transparent); }
+.msg.good { background: var(--ok-bg);   color: var(--ok);   border-color: color-mix(in srgb, var(--ok) 35%, transparent); }
+
+#accounts { display: grid; gap: .4rem; max-width: 27rem; }
+.pick {
+  display: grid; grid-template-columns: 7.2rem 1fr; gap: .8rem; align-items: baseline;
+  width: 100%; text-align: left; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: .55rem .75rem;
+}
+.pick:hover { border-color: var(--accent); }
+.pick b { font-family: var(--data); font-weight: 500; color: var(--accent); font-size: .9rem; }
+.pick span { color: var(--muted); font-size: .82rem; line-height: 1.4; }
+
+.footnote { font-size: .78rem; color: var(--muted); max-width: 46ch; }
+
+/* --- app shell ------------------------------------------------------------- */
+
+#app {
+  display: grid; grid-template-columns: 232px 1fr; min-height: 100vh;
+  /* The rail is 100vh and sticky so it stays put while the page scrolls, which
+     leaves its column bare below the fold. Painting the column behind it keeps
+     the page looking like one page when it is printed or captured whole. */
+  background: linear-gradient(to right, var(--rail) 232px, transparent 232px);
+}
+#rail {
+  background: var(--rail); color: var(--rail-ink); padding: 1.1rem .85rem;
+  display: flex; flex-direction: column; gap: 1.1rem; position: sticky; top: 0; height: 100vh;
+}
+#rail .brand { display: flex; flex-direction: column; gap: .1rem; padding: 0 .35rem; }
+#rail .brand b { font-family: var(--display); font-weight: 600; color: #fff; font-size: 1rem; line-height: 1.25; }
+#rail .brand span { font-size: .72rem; color: var(--rail-muted); }
+#rail nav { display: flex; flex-direction: column; gap: 1px; }
+#rail nav a {
+  display: flex; justify-content: space-between; align-items: center; gap: .5rem;
+  padding: .5rem .6rem; border-radius: var(--radius); color: var(--rail-ink);
+  text-decoration: none; font-size: .9rem;
+}
+#rail nav a:hover { background: #ffffff12; }
+#rail nav a[aria-current="page"] { background: var(--accent); color: var(--accent-ink); font-weight: 500; }
+#rail nav a small { font-family: var(--data); font-size: .7rem; opacity: .7; }
+#rail .who { margin-top: auto; border-top: 1px solid var(--rail-line); padding-top: .8rem; display: grid; gap: .5rem; }
+#rail .who .name { font-family: var(--data); font-size: .88rem; color: #fff; }
+#rail .who .roles { display: flex; flex-wrap: wrap; gap: .25rem; }
+#rail .who .roles i { font-style: normal; font-size: .66rem; font-family: var(--data); color: var(--rail-muted); border: 1px solid var(--rail-line); border-radius: 999px; padding: .05em .5em; }
+#rail .who button {
+  background: transparent; border: 1px solid var(--rail-line); color: var(--rail-ink);
+  border-radius: var(--radius); padding: .35em .6em; font-size: .82rem; cursor: pointer; text-align: left;
+}
+#rail .who button:hover { border-color: var(--accent); color: var(--accent); }
+
+main { padding: 1.6rem clamp(1rem, 2.6vw, 2.2rem) 4rem; min-width: 0; }
+.head { display: flex; flex-wrap: wrap; gap: .6rem 1.2rem; align-items: baseline; margin-bottom: 1.2rem; }
+.head p { color: var(--muted); font-size: .89rem; margin: 0; max-width: 70ch; }
+
+.grid { display: grid; gap: .9rem; }
+.cols { grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr)); }
+
+.tile { padding: .95rem 1rem; display: grid; gap: .55rem; }
+.tile .top { display: flex; justify-content: space-between; gap: .6rem; align-items: baseline; }
+.tile .top b { font-size: .96rem; font-weight: 600; }
+.tile .code { font-family: var(--data); font-size: .74rem; color: var(--muted); }
+.tile .figures { display: flex; justify-content: space-between; align-items: baseline; font-size: .84rem; color: var(--muted); }
+.tile .figures .big { font-family: var(--data); font-weight: 500; font-size: 1.15rem; color: var(--ink); }
+.tile ul { margin: 0; padding: 0; list-style: none; display: grid; gap: .18rem; font-size: .8rem; }
+.tile ul li { display: flex; justify-content: space-between; gap: .8rem; color: var(--muted); }
+.tile ul li b { font-family: var(--data); font-weight: 500; color: var(--ink-2); }
+.tile .remark { font-size: .76rem; color: var(--muted); border-top: 1px dashed var(--line); padding-top: .45rem; }
+
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: .87rem; }
+th, td { padding: .48rem .7rem; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th {
+  position: sticky; top: 0; background: var(--surface-2); z-index: 1;
+  font-size: .7rem; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); font-weight: 600;
+}
+td.n, th.n { text-align: right; font-family: var(--data); font-variant-numeric: tabular-nums; }
+tbody tr:hover { background: var(--surface-2); }
+tr.dim td { color: var(--muted); }
+tr.total td { font-weight: 600; background: var(--surface-2); border-top: 2px solid var(--line-strong); }
+td.wrap { white-space: normal; min-width: 16rem; color: var(--muted); }
+
+.toolbar { display: flex; flex-wrap: wrap; gap: .7rem; align-items: flex-end; margin-bottom: .9rem; }
+.toolbar label.field { min-width: 9rem; }
+.spacer { flex: 1; }
+
+.findings { display: grid; gap: .5rem; }
+.finding { border-left: 3px solid; padding: .5rem .75rem; border-radius: 0 var(--radius) var(--radius) 0; font-size: .87rem; }
+.finding.BLOCK   { border-color: var(--crit); background: var(--crit-bg); color: var(--crit); }
+.finding.WARNING { border-color: var(--warn); background: var(--warn-bg); color: var(--warn); }
+.finding.OK      { border-color: var(--ok);   background: var(--ok-bg);   color: var(--ok); }
+.finding code { font-family: var(--data); font-size: .72rem; opacity: .8; display: block; }
+
+dialog {
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface);
+  color: var(--ink); padding: 0; box-shadow: var(--shadow); max-width: min(34rem, 92vw); width: 100%;
+}
+dialog::backdrop { background: #000a; }
+dialog .body { padding: 1.1rem 1.2rem; display: grid; gap: .8rem; }
+dialog .foot { padding: .8rem 1.2rem; border-top: 1px solid var(--line); display: flex; gap: .6rem; justify-content: flex-end; background: var(--surface-2); }
+dialog h2 { padding: 1.1rem 1.2rem 0; }
+
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; }
+.note { font-size: .8rem; color: var(--muted); }
+
+@media (max-width: 900px) {
+  #login { grid-template-columns: 1fr; }
+  #app { grid-template-columns: 1fr; background: none; }
+  #rail { position: static; height: auto; }
+  #rail nav { flex-direction: row; flex-wrap: wrap; }
+  .two { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<!-- ========================================================================
+     Sign in
+     ===================================================================== -->
+<section id="login">
+  <div class="plate">
+    <div>
+      <div class="eyebrow">Kampong Speu Sugar Co., Ltd.</div>
+      <h1>Storage, capacity and the 2026/27 season plan</h1>
+    </div>
+    <p>
+      Every warehouse, tank and silo the factory has, what is in them, and what
+      the plan says will be in them on each of the 276 days of the season. The
+      system refuses a receipt that will not fit, and says which limit it hit.
+    </p>
+    <figure id="chartwrap" style="margin:0">
+      <canvas id="chart" aria-label="Planned finished sugar stock against warehouse capacity"></canvas>
+      <figcaption id="chartcap"></figcaption>
+    </figure>
+    <p class="footnote" style="color:var(--rail-muted)">
+      This page runs entirely in your browser. Nothing is sent anywhere, and
+      what you change is kept only on this device.
+    </p>
+  </div>
+
+  <div class="panel">
+    <form id="signin" class="card" autocomplete="off">
+      <div>
+        <div class="eyebrow">Sign in</div>
+        <h2 style="margin-top:.15rem">Sugar Production Planning</h2>
+      </div>
+      <div id="loginmsg" hidden></div>
+      <label class="field"><span>User name</span>
+        <input id="u" type="text" autocomplete="username" spellcheck="false"></label>
+      <label class="field"><span>Password</span>
+        <input id="p" type="password" autocomplete="current-password"></label>
+      <div class="row">
+        <button class="btn primary" type="submit">Sign in</button>
+        <span class="note">or pick an account below</span>
+      </div>
+    </form>
+
+    <div>
+      <div class="eyebrow" style="margin-bottom:.45rem">Demo accounts — password <span class="num">Demo-Sugar-2027</span></div>
+      <div id="accounts"></div>
+    </div>
+
+    <p class="footnote">
+      The five accounts differ only in what they are allowed to do, which is the
+      point of trying them. There is no server here, so this page compares the
+      password as text; the real system stores a bcrypt hash and never the
+      password itself.
+    </p>
+  </div>
+</section>
+
+<!-- ========================================================================
+     The system
+     ===================================================================== -->
+<div id="app" hidden>
+  <aside id="rail">
+    <div class="brand">
+      <b>Sugar Production Planning</b>
+      <span>Kampong Speu Sugar · KSS-F1</span>
+    </div>
+    <nav id="nav"></nav>
+    <div class="who">
+      <div>
+        <div class="name" id="whoname"></div>
+        <div class="roles" id="whoroles"></div>
+      </div>
+      <button type="button" id="changepw">Change password</button>
+      <button type="button" id="resetdemo">Reset demo data</button>
+      <button type="button" id="signout">Sign out</button>
+    </div>
+  </aside>
+  <main id="view"></main>
+</div>
+
+<dialog id="dlg"><form method="dialog" id="dlgform"></form></dialog>
+
+<script>
+"use strict";
+
+/* =========================================================================
+   The data.
+
+   Extracted from backend/migrations by scripts/extract_seed_data.py, so the
+   numbers on this page are the numbers the real system starts with rather
+   than a retyped copy of them.
+   ====================================================================== */
+const SEED = /*{{DATA}}*/;
+
+const EPS = 1e-6;
+const DEMO_PASSWORD = "Demo-Sugar-2027";
+const STORE_KEY = "spp-demo-system-v2";
+
+/* --- roles ---------------------------------------------------------------
+   The same four roles the real system has, and the same rules about what
+   each may do. In the server those rules live in one table checked before
+   any handler runs (backend/internal/httpapi/auth.go); here they live in one
+   object checked before any action runs, for the same reason: a permission
+   spread across twenty places is a permission nobody can audit.
+   ---------------------------------------------------------------------- */
+const ROLES = {
+  ADMIN: "everything, including user administration",
+  PLANNER: "master data and the plan",
+  WAREHOUSE: "posting stock movements",
+  VIEWER: "read only",
+};
+
+const RULES = {
+  editMasterData: ["ADMIN", "PLANNER"],
+  editPlan: ["ADMIN", "PLANNER"],
+  postMovements: ["ADMIN", "WAREHOUSE"],
+  administerUsers: ["ADMIN"],
+};
+
+const DEMO_ACCOUNTS = [
+  { username: "admin", roles: ["ADMIN"], note: "Everything, including creating and deactivating accounts." },
+  { username: "planner", roles: ["PLANNER"], note: "Maintains storage master data and capacities. Cannot post stock." },
+  { username: "warehouse", roles: ["WAREHOUSE"], note: "Posts receipts and issues. Cannot change master data." },
+  { username: "refinery", roles: ["WAREHOUSE", "PLANNER"], note: "Both of the above, which is how a shift supervisor usually works." },
+  { username: "viewer", roles: ["VIEWER"], note: "Reads everything, changes nothing." },
+];
+
+/* =========================================================================
+   Formatting
+   ====================================================================== */
+
+/** Matches the server's num(): three decimals, trailing zeros trimmed. */
+function num(v) {
+  if (v === null || v === undefined) return "—";
+  let s = Number(v).toFixed(3);
+  s = s.replace(/0+$/, "").replace(/\.$/, "");
+  const [whole, frac] = s.split(".");
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return frac ? grouped + "." + frac : grouped;
+}
+function pct(value, total) {
+  if (total <= EPS) return value > EPS ? 100 : 0;
+  return (value / total) * 100;
+}
+/** A percentage to read rather than to reconcile against. Three decimals is
+ *  right in a refusal, where somebody may check the arithmetic; on a card it
+ *  is just noise between the eye and the number. */
+function pctText(value, total) {
+  return pct(value, total).toFixed(1) + "%";
+}
+function round(v, places) {
+  const f = Math.pow(10, places);
+  return Math.round(v * f) / f;
+}
+function esc(s) {
+  return String(s === null || s === undefined ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function human(iso) {
+  const [y, m, d] = iso.split("-").map(Number);
+  return d + " " + MONTHS[m - 1] + " " + y;
+}
+function todayIso() {
+  // The season is in the future relative to a real clock, so the working date
+  // defaults to the day the demo position was taken from rather than to now.
+  return "2027-02-15";
+}
+
+/* =========================================================================
+   Threshold bands (requirement section 18)
+   ====================================================================== */
+const BANDS = SEED.bands
+  .map(b => ({ code: b.code, name: b.name, severity: b.severity, from: b.from_percentage, to: b.to_percentage }))
+  .sort((a, b) => a.from - b.from);
+
+function classify(percentage) {
+  let best = BANDS[0];
+  for (const b of BANDS) if (percentage + EPS >= b.from) best = b;
+  return best;
+}
+
+/* =========================================================================
+   State
+   ====================================================================== */
+
+const typeOf = {};
+for (const t of SEED.storageTypes) typeOf[t.code] = t;
+const productOf = {};
+for (const p of SEED.products) productOf[p.code] = p;
+const packagingOf = {};
+for (const k of SEED.packaging) packagingOf[k.code] = k;
+const movementTypeOf = {};
+for (const m of SEED.movementTypes) movementTypeOf[m.code] = m;
+
+const membersOf = {};
+for (const m of SEED.groupMembers) (membersOf[m.group_code] ||= []).push(m.storage_code);
+
+let db = null;
+
+function freshLocations() {
+  return SEED.locations.map(l => ({
+    code: l.storage_code,
+    name: l.storage_name,
+    type: l.type_code,
+    typeName: typeOf[l.type_code].name,
+    tracksPackages: typeOf[l.type_code].tracks_packages,
+    physicalCapacity: l.physical_capacity,
+    safePct: l.safe_pct,
+    allowMixed: l.mixed_products,
+    status: l.status,
+    remark: l.remark,
+    uom: "TON",
+    version: 1,
+  }));
+}
+
+function freshCapacities() {
+  return SEED.productCapacity.map(c => ({
+    loc: c.storage_code,
+    product: c.product_code,
+    packaging: c.packaging_code,
+    maxPackages: c.max_packages,
+    maxWeight: c.max_weight,
+    remark: c.remark,
+    status: "ACTIVE",
+  }));
+}
+
+/* --- the daily plan, and what it implies for storage ----------------------
+
+   The workbook keys the daily production plan and, separately, the stock
+   movement of each storage pool. The two are not independent — the pool
+   figures follow from the production figures, exactly, on all 276 days:
+
+     Raw sugar pool   in  = raw sugar made, less what goes straight to remelt
+                      out = jumbo bagging, plus any remelt draw on a day
+                            nothing was crushed
+     Finished pool    in  = refined + white + super refined packed
+                      out = quota sales
+     Conditioning silo out = refined sugar packed out of it; the receipt into
+                            it is the workbook's balancing figure and is left
+                            as keyed
+
+   Which means editing a day's production has to move the storage curves with
+   it, or the plan screen would let somebody change the plan and see nothing
+   happen. The one place the workbook disagrees with itself is 30 Aug 2027,
+   where its keyed finished-goods total reads 450 t against components of
+   400 t; recomputing from the components is what reconciles to the summary
+   report's 106,100 t.
+   ---------------------------------------------------------------------- */
+const PLAN_COLUMNS = [
+  { i: 2, key: "cane", label: "Cane crushed" },
+  { i: 3, key: "raw", label: "Raw sugar made" },
+  { i: 4, key: "remelt", label: "Raw sugar to remelt" },
+  { i: 6, key: "packing", label: "Jumbo bagging out of the warehouse" },
+  { i: 7, key: "refined", label: "Refined sugar packed" },
+  { i: 8, key: "white", label: "White sugar packed" },
+  { i: 9, key: "super", label: "Super refined packed" },
+  { i: 10, key: "quota", label: "Quota sales delivered" },
+];
+
+function recomputeStoragePlan(plan) {
+  const byDate = {};
+  for (const r of plan) byDate[r[0]] = r;
+
+  const out = {};
+  for (const [scope, series] of Object.entries(SEED.storagePlan)) {
+    let opening = series[0][1];
+    const rows = [];
+    for (const orig of series) {
+      const date = orig[0];
+      const p = byDate[date];
+      let inWeight, outWeight;
+      if (!p) {
+        inWeight = orig[2]; outWeight = orig[3];
+      } else if (scope === "RAW-POOL") {
+        inWeight = Math.max(0, p[3] - p[4]);
+        outWeight = p[6] + Math.max(0, p[4] - p[3]);
+      } else if (scope === "FG-POOL") {
+        inWeight = p[7] + p[8] + p[9];
+        outWeight = p[10];
+      } else {
+        inWeight = orig[2];
+        outWeight = p[7];
+      }
+      const closing = opening + inWeight - outWeight;
+      rows.push([date, opening, inWeight, outWeight, closing]);
+      opening = closing;
+    }
+    out[scope] = rows;
+  }
+  return out;
+}
+
+function emptyDb() {
+  const plan = SEED.production.map(r => r.slice());
+  return {
+    plan,
+    storagePlan: recomputeStoragePlan(plan),
+    locations: freshLocations(),
+    capacities: freshCapacities(),
+    balances: {},          // "LOC|PRODUCT|PACKAGING|BATCH" -> {packages, weight}
+    movements: [],
+    users: DEMO_ACCOUNTS.map(a => ({
+      username: a.username, roles: a.roles.slice(), status: "ACTIVE",
+      isDemo: true, mustChangePassword: false, password: DEMO_PASSWORD,
+      failedAttempts: 0, lockedUntil: null, lastLoginAt: null, note: a.note, version: 1,
+    })),
+    seq: 1,
+    session: null,
+  };
+}
+
+function save() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(db)); } catch (e) { /* private mode */ }
+}
+function load() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && parsed.locations && parsed.users ? parsed : null;
+  } catch (e) { return null; }
+}
+
+/* --- balances ------------------------------------------------------------ */
+
+function balanceKey(loc, product, packaging, batch) {
+  return [loc, product, packaging, batch || ""].join("|");
+}
+function locationLines(loc) {
+  const out = [];
+  for (const [key, q] of Object.entries(db.balances)) {
+    const [l, product, packaging, batch] = key.split("|");
+    if (l === loc && (Math.abs(q.weight) > EPS || Math.abs(q.packages) > EPS)) {
+      out.push({ product, packaging, batch, packages: q.packages, weight: q.weight });
+    }
+  }
+  return out.sort((a, b) => b.weight - a.weight);
+}
+function locationTotal(loc) {
+  return locationLines(loc).reduce((sum, l) => sum + l.weight, 0);
+}
+function productsOnHand(loc) {
+  return [...new Set(locationLines(loc).map(l => l.product))];
+}
+function productStock(loc, product, packaging) {
+  let packages = 0, weight = 0;
+  for (const [key, q] of Object.entries(db.balances)) {
+    const [l, p, k] = key.split("|");
+    if (l === loc && p === product && k === packaging) { packages += q.packages; weight += q.weight; }
+  }
+  return { packages, weight };
+}
+function findLocation(code) { return db.locations.find(l => l.code === code); }
+function findCapacity(loc, product, packaging) {
+  return db.capacities.find(c => c.loc === loc && c.product === product && c.packaging === packaging) || null;
+}
+
+/* =========================================================================
+   The capacity rules (requirement section 24).
+
+   A line-for-line port of backend/internal/capacity/validate.go, including
+   the wording of the messages: a demo whose refusal reads differently from
+   the system's refusal teaches people the wrong sentence.
+   ====================================================================== */
+function validate(loc, product, packaging, qty) {
+  const uom = loc.uom || "TON";
+  const res = { allowed: true, requiresOverride: false, findings: [] };
+  const add = f => {
+    if (f.severity === "BLOCK") { res.allowed = false; res.requiresOverride = true; }
+    res.findings.push(f);
+  };
+
+  if (qty.weight <= EPS && qty.packages <= EPS) return res;
+
+  if (loc.status !== "ACTIVE") {
+    add({ check: "PRODUCT_ALLOWED", severity: "BLOCK", uom,
+      message: `Storage location ${loc.code} (${loc.name}) is not active` });
+    return res;
+  }
+
+  // --- 5. Physical maximum, against everything in the location, not just
+  // this product: product ceilings are limits, not additive capacity.
+  const total = locationTotal(loc.code);
+  const projectedTotal = total + qty.weight;
+  if (projectedTotal > loc.physicalCapacity + EPS) {
+    add({ check: "PHYSICAL_CAPACITY", severity: "BLOCK", uom,
+      message: `${loc.name} would hold ${num(projectedTotal)} ${uom} against a physical capacity of ${num(loc.physicalCapacity)} ${uom}`,
+      limit: round(loc.physicalCapacity, 3), projected: round(projectedTotal, 3),
+      excess: round(projectedTotal - loc.physicalCapacity, 3) });
+  }
+
+  // --- 4. Safe capacity
+  let safePct = loc.safePct;
+  if (safePct <= 0 || safePct > 100) safePct = 100;
+  const safeCapacity = loc.physicalCapacity * safePct / 100;
+  if (projectedTotal > safeCapacity + EPS && projectedTotal <= loc.physicalCapacity + EPS) {
+    add({ check: "SAFE_CAPACITY", severity: "WARNING", uom,
+      message: `${loc.name} would reach ${num(pct(projectedTotal, loc.physicalCapacity))}% of capacity, above the safe level of ${num(safePct)}%`,
+      limit: round(safeCapacity, 3), projected: round(projectedTotal, 3),
+      excess: round(projectedTotal - safeCapacity, 3) });
+  }
+
+  // --- Mixed products
+  if (!loc.allowMixed) {
+    if (productsOnHand(loc.code).some(p => p !== product.code)) {
+      add({ check: "MIXED_PRODUCTS", severity: "BLOCK", uom,
+        message: `${loc.name} does not allow mixed products and already holds another product` });
+    }
+  }
+
+  // --- 2 & 3. Product and packaging capacity
+  const cap = findCapacity(loc.code, product.code, packaging.code);
+  if (!cap) {
+    add({ check: "PRODUCT_ALLOWED", severity: "BLOCK", uom,
+      message: `No capacity is configured for ${product.name} in ${packaging.code} packaging at ${loc.name}` });
+    return res;
+  }
+  if (cap.status !== "ACTIVE") {
+    add({ check: "PRODUCT_ALLOWED", severity: "BLOCK", uom,
+      message: `The capacity configuration for ${product.name} in ${packaging.code} packaging at ${loc.name} is inactive` });
+    return res;
+  }
+
+  const cur = productStock(loc.code, product.code, packaging.code);
+  const proj = { packages: cur.packages + qty.packages, weight: cur.weight + qty.weight };
+
+  if (cap.maxWeight !== null && cap.maxWeight !== undefined && proj.weight > cap.maxWeight + EPS) {
+    add({ check: "PRODUCT_CAPACITY", severity: "BLOCK", uom,
+      message: `${loc.name} in ${packaging.code} would hold ${num(proj.weight)} ${uom} of ${product.name} against a product limit of ${num(cap.maxWeight)} ${uom}`,
+      limit: round(cap.maxWeight, 3), projected: round(proj.weight, 3),
+      excess: round(proj.weight - cap.maxWeight, 3) });
+  }
+
+  if (cap.maxPackages !== null && cap.maxPackages !== undefined && loc.tracksPackages &&
+      proj.packages > cap.maxPackages + EPS) {
+    add({ check: "PACKAGE_CAPACITY", severity: "BLOCK", uom: "PACKAGE",
+      message: `${loc.name} would hold ${num(proj.packages)} ${packaging.code} packages of ${product.name} against a limit of ${num(cap.maxPackages)}`,
+      limit: round(cap.maxPackages, 3), projected: round(proj.packages, 3),
+      excess: round(proj.packages - cap.maxPackages, 3) });
+  }
+
+  if (res.findings.length === 0) {
+    res.findings.push({ check: "PHYSICAL_CAPACITY", severity: "OK", uom,
+      message: `${loc.name} would hold ${num(projectedTotal)} ${uom} of ${num(loc.physicalCapacity)} ${uom} — ${num(pct(projectedTotal, loc.physicalCapacity))}%` });
+  }
+  return res;
+}
+
+/* --- posting -------------------------------------------------------------- */
+
+function prepare(req) {
+  const loc = findLocation(req.storage);
+  if (!loc) throw new Error(`unknown storage location "${req.storage}"`);
+  const product = productOf[req.product];
+  if (!product) throw new Error(`unknown product "${req.product}"`);
+  const packaging = packagingOf[req.packaging];
+  if (!packaging) throw new Error(`unknown packaging type "${req.packaging}"`);
+  const mt = movementTypeOf[req.movementType];
+  if (!mt) throw new Error(`unknown movement type "${req.movementType}"`);
+
+  const per = packaging.weight_in_ton;
+  let qty;
+  if (req.packages !== null && req.packages !== undefined) {
+    if (packaging.is_bulk) throw new Error(`${packaging.code} is bulk packaging, supply a weight`);
+    qty = { packages: req.packages, weight: req.packages * per };
+  } else if (req.weight !== null && req.weight !== undefined) {
+    qty = { packages: per > 0 ? req.weight / per : 0, weight: req.weight };
+  } else {
+    throw new Error("supply a package count or a weight");
+  }
+  if (qty.weight < 0 || qty.packages < 0) throw new Error("quantities must be positive magnitudes");
+
+  const out = { direction: mt.direction, quantity: qty, validation: { allowed: true, findings: [] }, posted: false };
+
+  if (mt.requires_capacity_check) {
+    const checkQty = mt.direction === "OUT" ? { packages: 0, weight: 0 } : qty;
+    out.validation = validate(loc, product, packaging, checkQty);
+  } else if (mt.direction === "OUT") {
+    const cur = productStock(loc.code, product.code, packaging.code);
+    if (qty.weight > cur.weight + EPS) {
+      out.validation = {
+        allowed: false, requiresOverride: true,
+        findings: [{ check: "MINIMUM_STOCK", severity: "BLOCK", uom: loc.uom,
+          message: `${loc.name} holds ${num(cur.weight)} ${loc.uom} of ${product.name} in ${packaging.code}, less than the ${num(qty.weight)} requested`,
+          limit: round(cur.weight, 3), projected: round(qty.weight, 3),
+          excess: round(qty.weight - cur.weight, 3) }],
+      };
+    }
+  }
+  return { loc, product, packaging, mt, out };
+}
+
+function validateMovement(req) { return prepare(req).out; }
+
+function postMovement(req) {
+  const { loc, product, packaging, mt, out } = prepare(req);
+
+  if (!out.validation.allowed) {
+    if (!req.override) return out;
+    if (!req.overrideReason) throw new Error("an override requires a reason");
+  }
+
+  const sign = mt.direction === "OUT" ? -1 : 1;
+  const key = balanceKey(loc.code, product.code, packaging.code, req.batch);
+  const cur = db.balances[key] || { packages: 0, weight: 0 };
+  db.balances[key] = {
+    packages: cur.packages + sign * out.quantity.packages,
+    weight: cur.weight + sign * out.quantity.weight,
+  };
+
+  const id = db.seq++;
+  db.movements.push({
+    id, date: req.date || todayIso(), type: mt.code, typeName: mt.name, direction: mt.direction,
+    loc: loc.code, product: product.code, packaging: packaging.code, batch: req.batch || "",
+    packages: sign * out.quantity.packages, weight: sign * out.quantity.weight,
+    ref: req.ref || "", remark: req.remark || "", by: req.by || "system",
+    override: !!(req.override && !out.validation.allowed), overrideReason: req.override ? req.overrideReason : "",
+  });
+  out.posted = true;
+  out.movementId = id;
+  save();
+  return out;
+}
+
+/* =========================================================================
+   Seeding the opening position.
+
+   The same procedure the real system's seed-demo command runs: take the
+   plan's own closing figures for one day, split them across a plausible
+   product mix, spread a pool across its members in proportion to capacity,
+   and post every line through the ordinary posting path. If the position
+   loads, the posting path demonstrably works.
+   ====================================================================== */
+const SEED_DATE = "2027-02-15";
+const SPLITS = [
+  { scope: "RAW-POOL", product: "RAW-SUGAR", packaging: "PKG-BULK", batch: "RS26001", share: 0.80, movement: "WAREHOUSE_RECEIPT" },
+  { scope: "RAW-POOL", product: "RAW-SUGAR", packaging: "PKG-JUMBO", batch: "RJ26001", share: 0.20, movement: "WAREHOUSE_RECEIPT" },
+  { scope: "FG-POOL", product: "REFINED-SUGAR", packaging: "PKG-50KG", batch: "R26001", share: 0.40, movement: "PACKING_RECEIPT" },
+  { scope: "FG-POOL", product: "WHITE-SUGAR", packaging: "PKG-50KG", batch: "W26001", share: 0.45, movement: "PACKING_RECEIPT" },
+  { scope: "FG-POOL", product: "REFINED-SUGAR", packaging: "PKG-JUMBO", batch: "RJ26002", share: 0.15, movement: "PACKING_RECEIPT" },
+  { scope: "CON-S01", product: "REFINED-SUGAR", packaging: "PKG-BULK", batch: "", share: 1.00, movement: "PRODUCTION_RECEIPT" },
+];
+const MOLASSES_FILL = [["MOL-T01", 0.82], ["MOL-T02", 0.91], ["MOL-T03", 0.58]];
+
+function seedOpeningPosition() {
+  const closing = {};
+  for (const [scope, series] of Object.entries(SEED.storagePlan)) {
+    const row = series.find(r => r[0] === SEED_DATE);
+    if (row) closing[scope] = row[4];
+  }
+
+  const post = (storage, product, packaging, batch, movement, weight) => {
+    if (weight <= 0.0005) return;
+    const per = packagingOf[packaging].weight_in_ton;
+    const req = {
+      date: SEED_DATE, movementType: movement, storage, product, packaging, batch,
+      ref: "DEMO-" + SEED_DATE.replace(/-/g, ""), remark: "Demo opening position from the season plan",
+      by: "seed-demo",
+    };
+    if (per > 0) {
+      const whole = Math.round(weight / per);
+      if (whole < 1) return;
+      req.packages = whole;
+    } else {
+      req.weight = weight;
+    }
+    postMovement(req);
+  };
+
+  for (const s of SPLITS) {
+    const total = (closing[s.scope] || 0) * s.share;
+    if (total <= 0) continue;
+    const members = membersOf[s.scope];
+    if (!members) { post(s.scope, s.product, s.packaging, s.batch, s.movement, total); continue; }
+    const active = members.filter(c => (findLocation(c) || {}).status === "ACTIVE");
+    const pooled = active.reduce((sum, c) => sum + findLocation(c).physicalCapacity, 0);
+    for (const c of active) {
+      if (pooled <= 0) continue;
+      post(c, s.product, s.packaging, s.batch, s.movement, total * findLocation(c).physicalCapacity / pooled);
+    }
+  }
+  for (const [code, fill] of MOLASSES_FILL) {
+    post(code, "MOLASSES", "PKG-BULK", "", "TANK_RECEIPT", findLocation(code).physicalCapacity * fill);
+  }
+}
+
+function resetDb() {
+  db = emptyDb();
+  seedOpeningPosition();
+  db.session = null;
+  save();
+}
+
+/* =========================================================================
+   Sessions and sign-in
+   ====================================================================== */
+const SESSION_IDLE_MS = 12 * 60 * 60 * 1000;   // matches defaultSessionTTL
+const MAX_ATTEMPTS = 5;                         // matches maxLoginAttempts
+const LOCK_MS = 15 * 60 * 1000;                 // matches loginLockFor
+
+function currentUser() {
+  if (!db.session) return null;
+  if (Date.now() > db.session.expiresAt) { db.session = null; save(); return null; }
+  const user = db.users.find(u => u.username === db.session.username);
+  if (!user || user.status !== "ACTIVE") { db.session = null; save(); return null; }
+  // Sliding window: using the system keeps it alive, being away ends it.
+  db.session.expiresAt = Date.now() + SESSION_IDLE_MS;
+  return user;
+}
+function can(what) {
+  const user = currentUser();
+  if (!user) return false;
+  return (RULES[what] || []).some(r => user.roles.includes(r));
+}
+function requirePermission(what) {
+  if (!can(what)) {
+    const user = currentUser();
+    const need = (RULES[what] || []).join(" or ");
+    throw new Error(user
+      ? `${user.username} holds ${user.roles.join(", ")}; this needs ${need}`
+      : "sign in first");
+  }
+}
+
+function login(username, password) {
+  const rejected = "the user name or password is not correct";
+  username = String(username || "").trim().toLowerCase();
+  if (!username || !password) throw new Error("enter a user name and password");
+
+  const user = db.users.find(u => u.username === username);
+  if (!user) throw new Error(rejected);
+
+  if (user.lockedUntil && Date.now() < user.lockedUntil) {
+    const at = new Date(user.lockedUntil);
+    throw new Error("too many failed attempts. Try again after " +
+      String(at.getHours()).padStart(2, "0") + ":" + String(at.getMinutes()).padStart(2, "0"));
+  }
+
+  if (user.status !== "ACTIVE" || user.password !== password) {
+    // Counted even for a deactivated account, so the throttle cannot be
+    // sidestepped by guessing against one.
+    user.failedAttempts = (user.failedAttempts || 0) + 1;
+    if (user.failedAttempts >= MAX_ATTEMPTS) {
+      user.lockedUntil = Date.now() + LOCK_MS;
+      user.failedAttempts = 0;
+    }
+    save();
+    throw new Error(rejected);
+  }
+
+  user.failedAttempts = 0;
+  user.lockedUntil = null;
+  user.lastLoginAt = new Date().toISOString();
+  db.session = { username: user.username, issuedAt: Date.now(), expiresAt: Date.now() + SESSION_IDLE_MS };
+  save();
+  return user;
+}
+
+function logout() { db.session = null; save(); }
+
+/* =========================================================================
+   Rendering
+   ====================================================================== */
+
+const view = document.getElementById("view");
+const nav = document.getElementById("nav");
+
+const PAGES = [
+  { id: "dashboard", label: "Storage today", needs: null },
+  { id: "storage", label: "Storage master data", needs: null },
+  { id: "movement", label: "Post a movement", needs: null },
+  { id: "ledger", label: "Movement history", needs: null },
+  { id: "plan", label: "Daily production plan", needs: null },
+  { id: "users", label: "Users", needs: "administerUsers" },
+];
+
+function renderNav(active) {
+  const user = currentUser();
+  nav.innerHTML = PAGES
+    .filter(p => !p.needs || can(p.needs))
+    .map(p => `<a href="#/${p.id}"${p.id === active ? ' aria-current="page"' : ""}>${esc(p.label)}</a>`)
+    .join("");
+  document.getElementById("whoname").textContent = user ? user.username : "";
+  document.getElementById("whoroles").innerHTML = user
+    ? user.roles.map(r => `<i>${esc(r)}</i>`).join("") : "";
+}
+
+function head(title, blurb) {
+  return `<div class="head"><h1>${esc(title)}</h1><p>${blurb}</p></div>`;
+}
+
+/* --- storage today -------------------------------------------------------- */
+
+function poolRow(groupCode) {
+  const group = SEED.groups.find(g => g.group_code === groupCode);
+  const members = (membersOf[groupCode] || []).map(findLocation).filter(l => l && l.status === "ACTIVE");
+  const capacity = members.reduce((s, l) => s + l.physicalCapacity, 0);
+  const held = members.reduce((s, l) => s + locationTotal(l.code), 0);
+  return { name: group.group_name, code: groupCode, remark: group.remark, capacity, held, members };
+}
+
+function renderDashboard() {
+  const active = db.locations.filter(l => l.status === "ACTIVE");
+  const inactive = db.locations.filter(l => l.status !== "ACTIVE");
+
+  const tiles = active.map(l => {
+    const held = locationTotal(l.code);
+    const p = pct(held, l.physicalCapacity);
+    const band = classify(p);
+    const lines = locationLines(l.code);
+    return `<article class="card tile">
+      <div class="top">
+        <div><b>${esc(l.name)}</b><div class="code">${esc(l.code)} · ${esc(l.typeName)}</div></div>
+        <span class="chip ${band.severity}">${esc(band.name)}</span>
+      </div>
+      <div class="figures">
+        <span><span class="big">${num(held)}</span> / ${num(l.physicalCapacity)} t</span>
+        <span class="num">${pctText(held, l.physicalCapacity)}</span>
+      </div>
+      <div class="bar"><i class="${band.severity}" style="width:${Math.min(100, p).toFixed(2)}%"></i></div>
+      <ul>${lines.length ? lines.map(x =>
+        `<li><span>${esc(productOf[x.product].name)} · ${esc(x.packaging.replace("PKG-", ""))}${x.batch ? " · " + esc(x.batch) : ""}</span><b>${num(x.weight)} t</b></li>`
+      ).join("") : '<li><span>empty</span><b>0 t</b></li>'}</ul>
+      <div class="remark">Safe level ${num(l.safePct)}% (${num(l.physicalCapacity * l.safePct / 100)} t)${l.allowMixed ? "" : " · single product only"}</div>
+    </article>`;
+  }).join("");
+
+  const pools = ["RAW-POOL", "FG-POOL"].map(code => {
+    const pool = poolRow(code);
+    const p = pct(pool.held, pool.capacity);
+    const band = classify(p);
+    return `<article class="card tile">
+      <div class="top">
+        <div><b>${esc(pool.name)}</b><div class="code">${esc(pool.code)} · planned as one pool</div></div>
+        <span class="chip ${band.severity}">${esc(band.name)}</span>
+      </div>
+      <div class="figures">
+        <span><span class="big">${num(pool.held)}</span> / ${num(pool.capacity)} t</span>
+        <span class="num">${pctText(pool.held, pool.capacity)}</span>
+      </div>
+      <div class="bar"><i class="${band.severity}" style="width:${Math.min(100, p).toFixed(2)}%"></i></div>
+      <div class="remark">${esc(pool.remark)}</div>
+    </article>`;
+  }).join("");
+
+  view.innerHTML = head("Storage today",
+    `What every tank, silo and warehouse is holding against what it can hold. The
+     opening position is the season plan's own closing figures for
+     <span class="num">${human(SEED_DATE)}</span>, posted through the ordinary
+     receipt path — so it passed the same capacity checks as anything you post yourself.`)
+    + `<h2 style="margin:.4rem 0 .7rem">Pools the plan is written against</h2>
+       <div class="grid cols">${pools}</div>
+       <h2 style="margin:1.6rem 0 .7rem">Locations</h2>
+       <div class="grid cols">${tiles}</div>`
+    + (inactive.length ? `<h2 style="margin:1.6rem 0 .7rem">Not in use</h2>
+       <div class="tablewrap"><table><thead><tr><th>Code</th><th>Name</th><th class="n">Capacity</th><th>Why</th></tr></thead>
+       <tbody>${inactive.map(l => `<tr class="dim"><td class="num">${esc(l.code)}</td><td>${esc(l.name)}</td>
+         <td class="n">${num(l.physicalCapacity)} t</td><td class="wrap">${esc(l.remark)}</td></tr>`).join("")}</tbody></table></div>` : "")
+    + planFindings();
+}
+
+/** The two capacity findings, computed from the plan rather than asserted. */
+function findings() {
+  const out = [];
+  for (const [scope, capacityCodes] of [["RAW-POOL", membersOf["RAW-POOL"]], ["FG-POOL", membersOf["FG-POOL"]]]) {
+    const series = db.storagePlan[scope];
+    if (!series) continue;
+    const capacity = capacityCodes.map(findLocation).filter(l => l.status === "ACTIVE")
+      .reduce((s, l) => s + l.physicalCapacity, 0);
+    const safe = capacity * 0.95;
+    let peak = series[0], overSafe = null, overFull = null;
+    for (const row of series) {
+      if (row[4] > peak[4]) peak = row;
+      if (overSafe === null && row[4] > safe) overSafe = row;
+      if (overFull === null && row[4] > capacity) overFull = row;
+    }
+    out.push({
+      scope, name: SEED.groups.find(g => g.group_code === scope).group_name,
+      capacity, safe, peak, overSafe, overFull, last: series[series.length - 1],
+    });
+  }
+  return out;
+}
+
+function planFindings() {
+  const rows = findings().map(f => `<tr>
+      <td>${esc(f.name)}</td>
+      <td class="n">${num(f.capacity)} t</td>
+      <td class="n">${num(f.peak[4])} t</td>
+      <td class="num">${human(f.peak[0])}</td>
+      <td class="num">${f.overSafe ? human(f.overSafe[0]) : "—"}</td>
+      <td class="num">${f.overFull ? `<span class="chip FULL">${human(f.overFull[0])}</span>` : '<span class="chip NORMAL">never</span>'}</td>
+      <td class="n">${num(f.last[4])} t</td>
+    </tr>`).join("");
+  return `<h2 style="margin:1.6rem 0 .7rem">What the plan needs, against what exists</h2>
+    <p class="note" style="max-width:80ch;margin-bottom:.7rem">
+      Read straight off the 276 planned days. The raw sugar pool fits, but only because
+      20,700 t is bagged into jumbo bags and moved out of the covered warehouses between
+      21 Jan and 30 Mar 2027. The finished sugar pool does not fit at all.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Pool</th><th class="n">Capacity</th><th class="n">Peak planned</th><th>On</th>
+        <th>Over 95% safe</th><th>Over capacity</th><th class="n">Closing 2 Sep</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>`;
+}
+
+/* --- storage master data -------------------------------------------------- */
+
+function renderStorage() {
+  const editable = can("editMasterData");
+  const rows = db.locations.map(l => `<tr>
+    <td class="num">${esc(l.code)}</td>
+    <td>${esc(l.name)}</td>
+    <td>${esc(l.typeName)}</td>
+    <td class="n">${num(l.physicalCapacity)}</td>
+    <td class="n">${num(l.safePct)}%</td>
+    <td>${l.allowMixed ? "mixed" : "single"}</td>
+    <td>${l.status === "ACTIVE" ? '<span class="chip NORMAL">Active</span>' : '<span class="chip off">Inactive</span>'}</td>
+    <td class="wrap">${esc(l.remark)}</td>
+    <td><button class="btn small" data-edit="${esc(l.code)}"${editable ? "" : " disabled"}>Edit</button></td>
+  </tr>`).join("");
+
+  const caps = db.capacities.map(c => `<tr>
+    <td class="num">${esc(c.loc)}</td>
+    <td>${esc(productOf[c.product].name)}</td>
+    <td class="num">${esc(c.packaging)}</td>
+    <td class="n">${c.maxPackages === null || c.maxPackages === undefined ? "—" : num(c.maxPackages)}</td>
+    <td class="n">${c.maxWeight === null || c.maxWeight === undefined ? "—" : num(c.maxWeight) + " t"}</td>
+    <td class="wrap">${esc(c.remark)}</td>
+  </tr>`).join("");
+
+  view.innerHTML = head("Storage master data",
+    editable
+      ? `Capacities, safe levels and whether a location may hold more than one product.
+         Everything here is editable — nothing in the rules is compiled in.`
+      : `Capacities, safe levels and whether a location may hold more than one product.
+         <b>Your roles do not include changing this</b>, so the Edit buttons are off.
+         Sign in as <span class="num">planner</span> or <span class="num">admin</span> to try it.`)
+    + `<div class="tablewrap"><table>
+        <thead><tr><th>Code</th><th>Name</th><th>Type</th><th class="n">Capacity (t)</th><th class="n">Safe</th>
+          <th>Products</th><th>Status</th><th>Remark</th><th></th></tr></thead>
+        <tbody>${rows}</tbody></table></div>
+      <h2 style="margin:1.6rem 0 .7rem">Capacity per product and packaging</h2>
+      <p class="note" style="max-width:80ch;margin-bottom:.7rem">
+        A missing row here is not "no limit" — it means that product is not permitted
+        in that location at all, which is what a receipt is refused against. Rows marked
+        EXAMPLE in the remark come from the requirement document and need confirming
+        with operations.</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Location</th><th>Product</th><th>Packaging</th><th class="n">Max packages</th>
+          <th class="n">Max weight</th><th>Remark</th></tr></thead>
+        <tbody>${caps}</tbody></table></div>`;
+
+  view.querySelectorAll("[data-edit]").forEach(b =>
+    b.addEventListener("click", () => editLocation(b.dataset.edit)));
+}
+
+function editLocation(code) {
+  const l = findLocation(code);
+  openDialog(`Edit ${l.code}`, `
+    <label class="field"><span>Name</span><input id="f-name" type="text" value="${esc(l.name)}"></label>
+    <div class="two">
+      <label class="field"><span>Physical capacity (t)</span><input id="f-cap" type="number" step="0.001" min="0" value="${l.physicalCapacity}"></label>
+      <label class="field"><span>Safe capacity (%)</span><input id="f-safe" type="number" step="0.01" min="0" max="100" value="${l.safePct}"></label>
+    </div>
+    <div class="two">
+      <label class="field"><span>Products</span><select id="f-mixed">
+        <option value="1"${l.allowMixed ? " selected" : ""}>May hold more than one</option>
+        <option value="0"${l.allowMixed ? "" : " selected"}>Single product only</option></select></label>
+      <label class="field"><span>Status</span><select id="f-status">
+        <option value="ACTIVE"${l.status === "ACTIVE" ? " selected" : ""}>Active</option>
+        <option value="INACTIVE"${l.status === "ACTIVE" ? "" : " selected"}>Inactive</option></select></label>
+    </div>
+    <label class="field"><span>Remark</span><textarea id="f-remark">${esc(l.remark)}</textarea></label>
+    <p class="note">Holding ${num(locationTotal(l.code))} t right now. Lowering the capacity below that
+      is allowed — the system reports it as over capacity rather than pretending the sugar is not there.</p>`,
+    () => {
+      requirePermission("editMasterData");
+      const cap = Number(document.getElementById("f-cap").value);
+      const safe = Number(document.getElementById("f-safe").value);
+      if (!(cap >= 0)) throw new Error("capacity must be a number of tons, zero or more");
+      if (!(safe > 0 && safe <= 100)) throw new Error("the safe level must be between 0 and 100 per cent");
+      l.name = document.getElementById("f-name").value.trim() || l.name;
+      l.physicalCapacity = cap;
+      l.safePct = safe;
+      l.allowMixed = document.getElementById("f-mixed").value === "1";
+      l.status = document.getElementById("f-status").value;
+      l.remark = document.getElementById("f-remark").value.trim();
+      l.version++;
+      save();
+      route();
+      toast(`${l.code} saved.`);
+    });
+}
+
+/* --- post a movement ------------------------------------------------------ */
+
+function renderMovement() {
+  const mayPost = can("postMovements");
+  const locations = db.locations.filter(l => l.status === "ACTIVE");
+
+  view.innerHTML = head("Post a movement",
+    mayPost
+      ? `Every receipt is checked before it is written: physical capacity, the product's
+         own ceiling, the package count and the safe level. Anyone signed in may run the
+         check; posting needs the warehouse role.`
+      : `Anyone signed in may check whether a receipt would fit. <b>Posting needs the
+         warehouse role</b>, which yours does not include — check as much as you like,
+         the Post button stays off. Sign in as <span class="num">warehouse</span> to post.`)
+    + `<div class="card" style="padding:1.1rem;display:grid;gap:.9rem;max-width:64rem">
+      <div class="two">
+        <label class="field"><span>Storage location</span><select id="m-loc">
+          ${locations.map(l => `<option value="${esc(l.code)}"${l.code === "FG-WH01" ? " selected" : ""}>${esc(l.code)} — ${esc(l.name)}</option>`).join("")}
+        </select></label>
+        <label class="field"><span>Movement type</span><select id="m-type">
+          ${SEED.movementTypes.map(t => `<option value="${esc(t.code)}"${t.code === "PACKING_RECEIPT" ? " selected" : ""}>${esc(t.name)} (${esc(t.direction)})</option>`).join("")}
+        </select></label>
+      </div>
+      <div class="two">
+        <label class="field"><span>Product</span><select id="m-product">
+          ${SEED.products.map(p => `<option value="${esc(p.code)}"${p.code === "REFINED-SUGAR" ? " selected" : ""}>${esc(p.name)}</option>`).join("")}
+        </select></label>
+        <label class="field"><span>Packaging</span><select id="m-pkg">
+          ${SEED.packaging.map(k => `<option value="${esc(k.code)}"${k.code === "PKG-50KG" ? " selected" : ""}>${esc(k.description)}</option>`).join("")}
+        </select></label>
+      </div>
+      <div class="two">
+        <label class="field"><span id="m-qtylabel">Quantity</span><input id="m-qty" type="number" step="0.001" min="0" value="1000"></label>
+        <label class="field"><span>Measured in</span><select id="m-axis">
+          <option value="weight">Tons</option><option value="packages">Packages</option></select></label>
+      </div>
+      <div class="two">
+        <label class="field"><span>Batch</span><input id="m-batch" type="text" value="R26001" spellcheck="false"></label>
+        <label class="field"><span>Date</span><input id="m-date" type="date" value="${todayIso()}"></label>
+      </div>
+      <div class="two">
+        <label class="field"><span>Reference document</span><input id="m-ref" type="text" placeholder="e.g. PACK-2027-0412"></label>
+        <label class="field"><span>Remark</span><input id="m-remark" type="text"></label>
+      </div>
+      <div id="m-override" hidden>
+        <label class="field"><span>Reason for overriding the block</span>
+          <input id="m-reason" type="text" placeholder="required — it is written to the movement"></label>
+      </div>
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:center">
+        <button class="btn" id="m-check" type="button">Check capacity</button>
+        <button class="btn primary" id="m-post" type="button"${mayPost ? "" : " disabled"}>Post</button>
+        <button class="btn" id="m-fill" type="button">Fill it to bursting</button>
+        <span class="spacer"></span>
+        <span class="note" id="m-context"></span>
+      </div>
+      <div id="m-result"></div>
+    </div>`;
+
+  const refresh = () => {
+    const loc = findLocation(document.getElementById("m-loc").value);
+    const held = locationTotal(loc.code);
+    document.getElementById("m-context").textContent =
+      `${loc.name} holds ${num(held)} t of ${num(loc.physicalCapacity)} t (${pctText(held, loc.physicalCapacity)})`;
+    const pkg = packagingOf[document.getElementById("m-pkg").value];
+    const axis = document.getElementById("m-axis");
+    if (pkg.is_bulk) { axis.value = "weight"; axis.disabled = true; } else { axis.disabled = false; }
+    document.getElementById("m-qtylabel").textContent =
+      axis.value === "packages" ? "Quantity (packages)" : "Quantity (tons)";
+  };
+  ["m-loc", "m-pkg", "m-axis", "m-product"].forEach(id =>
+    document.getElementById(id).addEventListener("change", refresh));
+  refresh();
+
+  document.getElementById("m-check").addEventListener("click", () => runMovement(false));
+  document.getElementById("m-post").addEventListener("click", () => runMovement(true));
+  document.getElementById("m-fill").addEventListener("click", () => {
+    // Offers a quantity that certainly will not fit, so the refusal path is one
+    // click away rather than something you have to work out.
+    const loc = findLocation(document.getElementById("m-loc").value);
+    document.getElementById("m-axis").value = "weight";
+    document.getElementById("m-axis").dispatchEvent(new Event("change"));
+    document.getElementById("m-qty").value = String(round(loc.physicalCapacity, 0));
+    runMovement(false);
+  });
+}
+
+function movementRequest() {
+  const axis = document.getElementById("m-axis").value;
+  const qty = Number(document.getElementById("m-qty").value);
+  const req = {
+    storage: document.getElementById("m-loc").value,
+    movementType: document.getElementById("m-type").value,
+    product: document.getElementById("m-product").value,
+    packaging: document.getElementById("m-pkg").value,
+    batch: document.getElementById("m-batch").value.trim(),
+    date: document.getElementById("m-date").value || todayIso(),
+    ref: document.getElementById("m-ref").value.trim(),
+    remark: document.getElementById("m-remark").value.trim(),
+    by: (currentUser() || {}).username || "anonymous",
+  };
+  if (axis === "packages") req.packages = qty; else req.weight = qty;
+  return req;
+}
+
+function runMovement(post) {
+  const box = document.getElementById("m-result");
+  const overrideBox = document.getElementById("m-override");
+  let res;
+  try {
+    const req = movementRequest();
+    if (post) {
+      requirePermission("postMovements");
+      if (!overrideBox.hidden) {
+        req.override = true;
+        req.overrideReason = document.getElementById("m-reason").value.trim();
+      }
+      res = postMovement(req);
+    } else {
+      res = validateMovement(req);
+    }
+  } catch (err) {
+    box.innerHTML = `<div class="msg bad">${esc(err.message)}</div>`;
+    return;
+  }
+
+  const v = res.validation;
+  overrideBox.hidden = v.allowed;
+
+  const banner = res.posted
+    ? `<div class="msg good">Posted as movement #${res.movementId} — ${num(Math.abs(res.quantity.weight))} t${res.quantity.packages ? " (" + num(res.quantity.packages) + " packages)" : ""}.</div>`
+    : v.allowed
+      ? `<div class="msg good">Nothing blocks this. ${num(res.quantity.weight)} t${res.quantity.packages ? " · " + num(res.quantity.packages) + " packages" : ""}.</div>`
+      : `<div class="msg bad">Refused.${post ? " Nothing was written." : ""} Fix the quantity, or give a reason in the box above and post it as an override — the override and the reason go into the movement record.</div>`;
+
+  box.innerHTML = banner + `<div class="findings" style="margin-top:.6rem">` +
+    v.findings.map(f => `<div class="finding ${f.severity}">
+      ${esc(f.message)}
+      ${f.limit !== undefined ? `<code>${esc(f.check)} · limit ${num(f.limit)} · projected ${num(f.projected)} · over by ${num(f.excess)} ${esc(f.uom)}</code>` : `<code>${esc(f.check)}</code>`}
+    </div>`).join("") + `</div>`;
+
+  if (res.posted) { renderNav(currentPage()); }
+}
+
+/* --- movement history ----------------------------------------------------- */
+
+function renderLedger() {
+  const rows = db.movements.slice().reverse().slice(0, 500).map(m => `<tr${m.override ? ' class="dim"' : ""}>
+    <td class="num">#${m.id}</td>
+    <td class="num">${esc(m.date)}</td>
+    <td>${esc(m.typeName)}</td>
+    <td class="num">${esc(m.loc)}</td>
+    <td>${esc(productOf[m.product].name)}</td>
+    <td class="num">${esc(m.packaging.replace("PKG-", ""))}</td>
+    <td class="num">${esc(m.batch || "—")}</td>
+    <td class="n">${num(m.weight)}</td>
+    <td class="n">${m.packages ? num(m.packages) : "—"}</td>
+    <td class="num">${esc(m.by)}</td>
+    <td class="wrap">${m.override ? `<span class="chip CRITICAL">override</span> ${esc(m.overrideReason)}` : esc(m.remark)}</td>
+  </tr>`).join("");
+
+  view.innerHTML = head("Movement history",
+    `Every line the system has written, newest first, with who wrote it. An override
+     carries the reason it was forced — that record is the whole point of allowing one.`)
+    + `<div class="tablewrap"><table>
+      <thead><tr><th>#</th><th>Date</th><th>Type</th><th>Location</th><th>Product</th><th>Pack</th>
+        <th>Batch</th><th class="n">Weight (t)</th><th class="n">Packages</th><th>By</th><th>Remark</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="11">Nothing posted yet.</td></tr>'}</tbody></table></div>`;
+}
+
+/* --- season plan ---------------------------------------------------------- */
+
+function renderPlan() {
+  const editable = can("editPlan");
+  const months = [...new Set(db.plan.map(r => r[0].slice(0, 7)))];
+  const chosen = renderPlan.month && months.includes(renderPlan.month) ? renderPlan.month : "2027-02";
+  const rows = db.plan.filter(r => r[0].startsWith(chosen));
+
+  const sum = i => rows.reduce((s, r) => s + r[i], 0);
+  const seasonSum = i => db.plan.reduce((s, r) => s + r[i], 0);
+  const edited = db.plan.filter(r => r[13]).length;
+
+  view.innerHTML = head("Daily production plan",
+    (editable
+      ? `The corrected workbook, day by day, and editable a day at a time. Changing a
+         day moves the storage curves with it, because the pool figures follow from the
+         production figures rather than sitting beside them.`
+      : `The corrected workbook, day by day. <b>Changing it needs the planner role</b>,
+         which yours does not include. Sign in as <span class="num">planner</span> to edit a day.`)
+    + ` ${num(seasonSum(2))} t of cane at 11.00% recovery, crushing 1 Dec 2026 to
+        16 Apr 2027, remelt to 2 Sep 2027, ${db.plan.length} planned days.`)
+    + planAgainstCapacity()
+    + `<div class="toolbar" style="margin-top:1.4rem">
+        <label class="field"><span>Month</span><select id="pl-month">
+          ${months.map(m => {
+            const [y, mo] = m.split("-");
+            return `<option value="${m}"${m === chosen ? " selected" : ""}>${MONTHS[Number(mo) - 1]} ${y}</option>`;
+          }).join("")}
+        </select></label>
+        ${edited ? `<button class="btn" id="pl-revert" type="button">Put the workbook back (${edited} day${edited === 1 ? "" : "s"} changed)</button>` : ""}
+        <span class="spacer"></span>
+        <span class="note" style="max-width:44ch;text-align:right">Season totals — raw sugar ${num(seasonSum(3))} t · refined ${num(seasonSum(7))} t ·
+          white ${num(seasonSum(8))} t · super refined ${num(seasonSum(9))} t · quota sales ${num(seasonSum(10))} t</span>
+      </div>
+      <div class="tablewrap" style="max-height:58vh;overflow-y:auto">
+        <table><thead><tr>
+          <th></th><th>Date</th><th class="n">Day</th><th class="n">Cane</th><th class="n">Raw sugar</th>
+          <th class="n">To remelt</th><th class="n">Jumbo packing</th><th class="n">Refined</th>
+          <th class="n">White</th><th class="n">Super refined</th><th class="n">Quota sales</th>
+          <th>Note</th>
+        </tr></thead><tbody>
+        ${rows.map(r => `<tr${r[11] ? ' class="dim"' : ""}>
+          <td><button class="btn small" data-day="${esc(r[0])}"${editable ? "" : " disabled"}>Edit</button></td>
+          <td class="num">${esc(r[0])}${r[13] ? ' <span class="chip role">changed</span>' : ""}</td>
+          <td class="n">${r[1] === null ? "—" : r[1]}</td>
+          <td class="n">${num(r[2])}</td><td class="n">${num(r[3])}</td><td class="n">${num(r[4])}</td>
+          <td class="n">${num(r[6])}</td><td class="n">${num(r[7])}</td><td class="n">${num(r[8])}</td>
+          <td class="n">${num(r[9])}</td><td class="n">${num(r[10])}</td>
+          <td class="wrap" style="min-width:12rem">${r[11] ? "cleaning day. " : ""}${esc(r[12])}</td></tr>`).join("")}
+        <tr class="total"><td></td><td>Month</td><td></td>
+          <td class="n">${num(sum(2))}</td><td class="n">${num(sum(3))}</td><td class="n">${num(sum(4))}</td>
+          <td class="n">${num(sum(6))}</td><td class="n">${num(sum(7))}</td><td class="n">${num(sum(8))}</td>
+          <td class="n">${num(sum(9))}</td><td class="n">${num(sum(10))}</td><td></td></tr>
+        </tbody></table></div>`;
+
+  document.getElementById("pl-month").addEventListener("change", e => {
+    renderPlan.month = e.target.value;
+    renderPlan();
+  });
+  view.querySelectorAll("[data-day]").forEach(b => b.addEventListener("click", () => editPlanDay(b.dataset.day)));
+  const revert = document.getElementById("pl-revert");
+  if (revert) revert.addEventListener("click", () => {
+    try {
+      requirePermission("editPlan");
+      db.plan = SEED.production.map(r => r.slice());
+      db.storagePlan = recomputeStoragePlan(db.plan);
+      save(); renderPlan(); toast("The workbook's own figures are back.");
+    } catch (err) { toast(err.message, true); }
+  });
+}
+
+/** What the plan asks of storage, recomputed from whatever the plan now says. */
+function planAgainstCapacity() {
+  const cards = findings().map(f => {
+    const p = pct(f.peak[4], f.capacity);
+    const band = classify(p);
+    return `<article class="card tile">
+      <div class="top">
+        <div><b>${esc(f.name)}</b><div class="code">peak of the season · ${esc(f.peak[0])}</div></div>
+        <span class="chip ${band.severity}">${esc(band.name)}</span>
+      </div>
+      <div class="figures">
+        <span><span class="big">${num(f.peak[4])}</span> / ${num(f.capacity)} t</span>
+        <span class="num">${pctText(f.peak[4], f.capacity)}</span>
+      </div>
+      <div class="bar"><i class="${band.severity}" style="width:${Math.min(100, p).toFixed(2)}%"></i></div>
+      <ul>
+        <li><span>First over the 95% safe level</span><b>${f.overSafe ? human(f.overSafe[0]) : "never"}</b></li>
+        <li><span>First over capacity</span><b>${f.overFull ? human(f.overFull[0]) : "never"}</b></li>
+        <li><span>Closing ${human(f.last[0])}</span><b>${num(f.last[4])} t</b></li>
+      </ul>
+    </article>`;
+  }).join("");
+
+  const silo = db.storagePlan["CON-S01"] || [];
+  const lowest = silo.reduce((a, r) => (r[4] < a[4] ? r : a), silo[0]);
+  const siloNote = lowest && lowest[4] < -EPS
+    ? `<div class="msg bad" style="margin-top:.7rem">The conditioning silo runs to
+        ${num(lowest[4])} t on ${human(lowest[0])} — the plan now packs more refined sugar
+        out of it than the workbook's receipts put in.</div>`
+    : "";
+
+  return `<div class="grid cols">${cards}</div>${siloNote}`;
+}
+
+function editPlanDay(date) {
+  const r = db.plan.find(x => x[0] === date);
+  openDialog(`Plan for ${human(date)}`, `
+    <p class="note" style="margin:0">Day ${r[1] === null ? "—" : r[1]} of the season. Every figure is
+      tons for that one day.</p>
+    <div class="two">
+      ${PLAN_COLUMNS.map(c => `<label class="field"><span>${esc(c.label)}</span>
+        <input id="pd-${c.key}" type="number" step="0.001" min="0" value="${r[c.i]}"></label>`).join("")}
+    </div>
+    <label class="field"><span>Note</span><input id="pd-note" type="text" value="${esc(r[12])}"></label>
+    <label style="display:flex;gap:.5rem;align-items:baseline;font-size:.9rem">
+      <input id="pd-clean" type="checkbox"${r[11] ? " checked" : ""} style="width:auto">
+      <span>Cleaning day</span></label>
+    <p class="note">Saving recomputes the raw and finished sugar curves for the rest of the
+      season from this day forward, and with them the dates each pool passes its safe level
+      and its capacity.</p>`,
+    () => {
+      requirePermission("editPlan");
+      const values = {};
+      for (const c of PLAN_COLUMNS) {
+        const v = Number(document.getElementById("pd-" + c.key).value);
+        if (!isFinite(v) || v < 0) throw new Error(`${c.label} must be tons, zero or more`);
+        values[c.key] = v;
+      }
+      const before = findings();
+      for (const c of PLAN_COLUMNS) r[c.i] = values[c.key];
+      r[11] = document.getElementById("pd-clean").checked ? 1 : 0;
+      r[12] = document.getElementById("pd-note").value.trim();
+      r[13] = 1;   // marks the day as changed from the workbook
+      db.storagePlan = recomputeStoragePlan(db.plan);
+      const after = findings();
+
+      save();
+      renderPlan();
+
+      const moved = after.map((a, i) => {
+        const b = before[i];
+        const was = b.overFull ? b.overFull[0] : null;
+        const now = a.overFull ? a.overFull[0] : null;
+        if (was === now) return null;
+        return `${a.name}: ${now ? "over capacity on " + human(now) : "no longer goes over capacity"}` +
+               (was ? ` (was ${human(was)})` : "");
+      }).filter(Boolean);
+      toast(moved.length ? moved.join(" · ") : `${human(date)} saved.`);
+    });
+}
+
+/* --- users ---------------------------------------------------------------- */
+
+function renderUsers() {
+  const me = currentUser();
+  const rows = db.users.map(u => `<tr>
+    <td class="num">${esc(u.username)}${u.username === me.username ? ' <span class="chip role">you</span>' : ""}</td>
+    <td>${u.roles.map(r => `<span class="chip role">${esc(r)}</span>`).join(" ")}</td>
+    <td>${u.status === "ACTIVE" ? '<span class="chip NORMAL">Active</span>' : '<span class="chip off">Deactivated</span>'}</td>
+    <td>${u.isDemo ? '<span class="chip CRITICAL">demo</span>' : "—"}</td>
+    <td class="num">${u.lastLoginAt ? u.lastLoginAt.slice(0, 16).replace("T", " ") : "never"}</td>
+    <td>
+      <button class="btn small" data-user="${esc(u.username)}">Edit</button>
+      <button class="btn small" data-toggle="${esc(u.username)}"${u.username === me.username ? " disabled" : ""}>${u.status === "ACTIVE" ? "Deactivate" : "Reactivate"}</button>
+    </td></tr>`).join("");
+
+  view.innerHTML = head("Users",
+    `Accounts and what each may do. Every one of these has the password
+     <span class="num">Demo-Sugar-2027</span>, which is published in the repository —
+     that is fine for invented data and unacceptable for anything real. The real system
+     removes them with <span class="num">spp-seed-users -remove-demo</span>.`)
+    + `<div class="toolbar"><button class="btn primary" id="u-new" type="button">New user</button></div>
+      <div class="tablewrap"><table>
+        <thead><tr><th>User name</th><th>Roles</th><th>Status</th><th>Seeded</th><th>Last signed in</th><th></th></tr></thead>
+        <tbody>${rows}</tbody></table></div>
+      <h2 style="margin:1.6rem 0 .7rem">What each role may do</h2>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Action</th>${Object.keys(ROLES).map(r => `<th>${esc(r)}</th>`).join("")}</tr></thead>
+        <tbody>${Object.entries(RULES).map(([action, allowed]) => `<tr>
+          <td>${esc({ editMasterData: "Change storage master data", postMovements: "Post stock movements", administerUsers: "Administer users" }[action])}</td>
+          ${Object.keys(ROLES).map(r => `<td>${allowed.includes(r) ? '<span class="chip NORMAL">yes</span>' : '<span class="chip off">no</span>'}</td>`).join("")}
+        </tr>`).join("")}
+        <tr><td>Read everything</td>${Object.keys(ROLES).map(() => '<td><span class="chip NORMAL">yes</span></td>').join("")}</tr>
+        </tbody></table></div>`;
+
+  view.querySelectorAll("[data-user]").forEach(b => b.addEventListener("click", () => editUser(b.dataset.user)));
+  view.querySelectorAll("[data-toggle]").forEach(b => b.addEventListener("click", () => {
+    try {
+      requirePermission("administerUsers");
+      const u = db.users.find(x => x.username === b.dataset.toggle);
+      if (u.status === "ACTIVE" && u.roles.includes("ADMIN") &&
+          db.users.filter(x => x.status === "ACTIVE" && x.roles.includes("ADMIN")).length === 1) {
+        throw new Error("that is the only active administrator; the system would lock everyone out");
+      }
+      u.status = u.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
+      save(); route(); toast(`${u.username} is now ${u.status.toLowerCase()}.`);
+    } catch (err) { toast(err.message, true); }
+  }));
+  document.getElementById("u-new").addEventListener("click", () => editUser(null));
+}
+
+function editUser(username) {
+  const u = username ? db.users.find(x => x.username === username) : null;
+  openDialog(u ? `Edit ${u.username}` : "New user", `
+    <label class="field"><span>User name</span>
+      <input id="f-user" type="text" value="${esc(u ? u.username : "")}"${u ? " disabled" : ""} spellcheck="false"></label>
+    <div class="field"><span style="font-weight:500">Roles</span>
+      ${Object.entries(ROLES).map(([r, what]) => `<label style="display:flex;gap:.5rem;align-items:baseline;color:var(--ink);font-size:.9rem">
+        <input type="checkbox" name="role" value="${r}"${u && u.roles.includes(r) ? " checked" : ""} style="width:auto">
+        <span><b class="num">${r}</b> — ${esc(what)}</span></label>`).join("")}
+    </div>
+    ${u ? "" : `<label class="field"><span>Password</span><input id="f-pass" type="text" value="${esc(DEMO_PASSWORD)}"></label>`}
+    <p class="note">The real system stores a bcrypt hash at cost 11 and requires at least ten
+      characters. Roles are checked before the request reaches a handler, not inside it.</p>`,
+    () => {
+      requirePermission("administerUsers");
+      const roles = [...document.querySelectorAll('input[name=role]:checked')].map(i => i.value);
+      if (!roles.length) throw new Error("give the account at least one role, or it can do nothing");
+      if (u) {
+        if (u.roles.includes("ADMIN") && !roles.includes("ADMIN") &&
+            db.users.filter(x => x.status === "ACTIVE" && x.roles.includes("ADMIN")).length === 1) {
+          throw new Error("that is the only active administrator; taking the role away locks everyone out");
+        }
+        u.roles = roles; u.version++;
+        toast(`${u.username} saved.`);
+      } else {
+        const name = document.getElementById("f-user").value.trim().toLowerCase();
+        if (!/^[a-z0-9._-]{3,64}$/.test(name)) throw new Error("user names are 3 to 64 characters, lower case");
+        if (db.users.some(x => x.username === name)) throw new Error(`${name} already exists`);
+        const pass = document.getElementById("f-pass").value;
+        if (pass.length < 10) throw new Error("passwords are at least ten characters");
+        db.users.push({ username: name, roles, status: "ACTIVE", isDemo: false, mustChangePassword: true,
+          password: pass, failedAttempts: 0, lockedUntil: null, lastLoginAt: null, note: "", version: 1 });
+        toast(`${name} created.`);
+      }
+      save(); route();
+    });
+}
+
+/* =========================================================================
+   Dialog, toast, routing
+   ====================================================================== */
+
+const dlg = document.getElementById("dlg");
+
+function openDialog(title, bodyHtml, onSave) {
+  dlg.innerHTML = `<h2>${esc(title)}</h2><div class="body">${bodyHtml}<div id="dlgerr" hidden></div></div>
+    <div class="foot"><button class="btn" id="dlg-cancel" type="button">Cancel</button>
+    <button class="btn primary" id="dlg-save" type="button">Save</button></div>`;
+  dlg.showModal();
+  document.getElementById("dlg-cancel").addEventListener("click", () => dlg.close());
+  document.getElementById("dlg-save").addEventListener("click", () => {
+    const err = document.getElementById("dlgerr");
+    try { onSave(); dlg.close(); }
+    catch (e) { err.hidden = false; err.className = "msg bad"; err.textContent = e.message; }
+  });
+}
+
+let toastTimer = null;
+function toast(message, bad) {
+  let el = document.getElementById("toast");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "toast";
+    el.style.cssText = "position:fixed;left:50%;bottom:1.4rem;transform:translateX(-50%);z-index:99;max-width:min(34rem,92vw)";
+    document.body.appendChild(el);
+  }
+  el.innerHTML = `<div class="msg ${bad ? "bad" : "good"}" style="box-shadow:var(--shadow)">${esc(message)}</div>`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.innerHTML = ""; }, 4200);
+}
+
+function currentPage() {
+  const id = (location.hash || "").replace(/^#\/?/, "") || "dashboard";
+  return PAGES.some(p => p.id === id) ? id : "dashboard";
+}
+
+function route() {
+  const user = currentUser();
+  if (!user) { showLogin(); return; }
+  document.getElementById("login").hidden = true;
+  document.getElementById("app").hidden = false;
+
+  let page = currentPage();
+  const def = PAGES.find(p => p.id === page);
+  if (def && def.needs && !can(def.needs)) {
+    // The same answer the server gives: the page exists, your roles do not
+    // reach it. Bouncing silently to the dashboard would teach nothing.
+    renderNav(page);
+    view.innerHTML = head("Not for your roles",
+      `<span class="num">${esc(user.username)}</span> holds
+       ${user.roles.map(r => `<span class="chip role">${esc(r)}</span>`).join(" ")}.
+       This page needs ${(RULES[def.needs] || []).map(r => `<span class="chip role">${esc(r)}</span>`).join(" or ")}.`)
+      + `<p class="note">In the real system this request never reaches the handler: it is
+         refused with 403 by the rule table in front of it. Sign in as
+         <span class="num">admin</span> to see the page.</p>`;
+    return;
+  }
+
+  renderNav(page);
+  ({ dashboard: renderDashboard, storage: renderStorage, movement: renderMovement,
+     ledger: renderLedger, plan: renderPlan, users: renderUsers }[page])();
+  save();
+}
+
+window.addEventListener("hashchange", route);
+
+/* =========================================================================
+   Sign-in screen
+   ====================================================================== */
+
+function showLogin() {
+  document.getElementById("app").hidden = true;
+  document.getElementById("login").hidden = false;
+  drawChart();
+}
+
+document.getElementById("accounts").innerHTML = DEMO_ACCOUNTS.map(a =>
+  `<button class="pick" type="button" data-account="${esc(a.username)}">
+     <b>${esc(a.username)}</b><span>${esc(a.note)}</span></button>`).join("");
+
+document.getElementById("accounts").addEventListener("click", e => {
+  const b = e.target.closest("[data-account]");
+  if (!b) return;
+  document.getElementById("u").value = b.dataset.account;
+  document.getElementById("p").value = DEMO_PASSWORD;
+  document.getElementById("signin").requestSubmit();
+});
+
+document.getElementById("signin").addEventListener("submit", e => {
+  e.preventDefault();
+  const msg = document.getElementById("loginmsg");
+  try {
+    login(document.getElementById("u").value, document.getElementById("p").value);
+    msg.hidden = true;
+    document.getElementById("p").value = "";
+    if (!location.hash || currentPage() === "dashboard") location.hash = "#/dashboard";
+    route();
+  } catch (err) {
+    msg.hidden = false;
+    msg.className = "msg bad";
+    msg.textContent = err.message;
+  }
+});
+
+document.getElementById("signout").addEventListener("click", () => {
+  logout();
+  document.getElementById("u").value = "";
+  document.getElementById("p").value = "";
+  document.getElementById("loginmsg").hidden = true;
+  showLogin();
+});
+
+document.getElementById("resetdemo").addEventListener("click", () => {
+  resetDb();
+  showLogin();
+  toast("Demo data reset to the opening position.");
+});
+
+document.getElementById("changepw").addEventListener("click", () => {
+  const me = currentUser();
+  openDialog("Change password", `
+    <label class="field"><span>Current password</span><input id="f-old" type="password"></label>
+    <label class="field"><span>New password</span><input id="f-new" type="password"></label>
+    <label class="field"><span>New password again</span><input id="f-new2" type="password"></label>
+    <p class="note">At least ten characters, as the real system requires. Changing it here
+      signs out nothing else, because there is nothing else — one browser, one session.</p>`,
+    () => {
+      if (document.getElementById("f-old").value !== me.password) throw new Error("the current password is not correct");
+      const next = document.getElementById("f-new").value;
+      if (next.length < 10) throw new Error("passwords are at least ten characters");
+      if (next !== document.getElementById("f-new2").value) throw new Error("the two new passwords are not the same");
+      me.password = next;
+      me.mustChangePassword = false;
+      save();
+      toast("Password changed. It is kept in this browser only.");
+    });
+});
+
+/* =========================================================================
+   The chart on the sign-in screen.
+
+   Planned finished sugar stock across the season against the 69,000 t the
+   two warehouses in the plan actually hold. It is the plan's central
+   problem, drawn from the plan's own numbers.
+   ====================================================================== */
+function drawChart() {
+  const canvas = document.getElementById("chart");
+  const series = (db && db.storagePlan) ? db.storagePlan["FG-POOL"] : null;
+  if (!canvas || !series) return;
+
+  const capacity = (membersOf["FG-POOL"] || [])
+    .map(c => SEED.locations.find(l => l.storage_code === c))
+    .filter(l => l && l.status === "ACTIVE")
+    .reduce((s, l) => s + l.physical_capacity, 0);
+
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth || 420, h = canvas.clientHeight || 190;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  const g = canvas.getContext("2d");
+  g.scale(dpr, dpr);
+  g.clearRect(0, 0, w, h);
+
+  const peak = Math.max(capacity, ...series.map(r => r[4]));
+  const top = peak * 1.08;
+  const pad = { l: 4, r: 4, t: 8, b: 18 };
+  const x = i => pad.l + (i / (series.length - 1)) * (w - pad.l - pad.r);
+  const y = v => h - pad.b - (v / top) * (h - pad.t - pad.b);
+
+  // The area under the planned curve, split at the capacity line so the part
+  // that has nowhere to go is a different colour from the part that fits.
+  const stroke = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#58B6C0";
+
+  g.beginPath();
+  g.moveTo(x(0), y(0));
+  series.forEach((r, i) => g.lineTo(x(i), y(r[4])));
+  g.lineTo(x(series.length - 1), y(0));
+  g.closePath();
+  g.fillStyle = "rgba(88,182,192,.16)";
+  g.fill();
+
+  g.save();
+  g.beginPath();
+  g.rect(0, 0, w, y(capacity));
+  g.clip();
+  g.beginPath();
+  g.moveTo(x(0), y(0));
+  series.forEach((r, i) => g.lineTo(x(i), y(r[4])));
+  g.lineTo(x(series.length - 1), y(0));
+  g.closePath();
+  g.fillStyle = "rgba(238,110,110,.30)";
+  g.fill();
+  g.restore();
+
+  g.beginPath();
+  series.forEach((r, i) => (i ? g.lineTo(x(i), y(r[4])) : g.moveTo(x(i), y(r[4]))));
+  g.strokeStyle = stroke; g.lineWidth = 1.6; g.stroke();
+
+  g.beginPath();
+  g.setLineDash([4, 3]);
+  g.moveTo(pad.l, y(capacity)); g.lineTo(w - pad.r, y(capacity));
+  g.strokeStyle = "rgba(238,110,110,.85)"; g.lineWidth = 1; g.stroke();
+  g.setLineDash([]);
+
+  g.fillStyle = "rgba(238,110,110,.95)";
+  g.font = '500 10px ui-monospace, monospace';
+  g.fillText(num(capacity) + " t of warehouse", pad.l + 2, y(capacity) - 4);
+
+  g.fillStyle = "rgba(127,146,145,.9)";
+  g.fillText("Dec 2026", pad.l, h - 5);
+  g.textAlign = "right";
+  g.fillText("Sep 2027", w - pad.r, h - 5);
+
+  let first = series.find(r => r[4] > capacity);
+  document.getElementById("chartcap").textContent = first
+    ? `Planned finished sugar stock. It passes ${num(capacity)} t on ${human(first[0])} and ends the season at ${num(series[series.length - 1][4])} t.`
+    : `Planned finished sugar stock against ${num(capacity)} t of warehouse.`;
+}
+
+window.addEventListener("resize", () => {
+  if (!document.getElementById("login").hidden) drawChart();
+});
+
+/* =========================================================================
+   Boot
+   ====================================================================== */
+db = load();
+if (!db) resetDb();
+route();
+</script>
