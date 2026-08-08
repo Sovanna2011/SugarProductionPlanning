@@ -44,8 +44,12 @@ type StorageLocationInput struct {
 	// Omit it to create.
 	Version *int `json:"version,omitempty"`
 	// Force allows shrinking capacity below the stock currently held.
-	Force     bool   `json:"force"`
-	UpdatedBy string `json:"updatedBy"`
+	Force bool `json:"force"`
+	// Ignored. The actor written to created_by and changed_by comes from the
+	// authenticated session, never from the request body (requirement
+	// section 8), so this field is unreachable from JSON and is kept only for
+	// callers inside the process, such as the seeder.
+	UpdatedBy string `json:"-"`
 }
 
 // Validate applies the rules that do not need the database.
@@ -114,7 +118,11 @@ type StorageProductCapacityInput struct {
 	Status            string     `json:"status"`
 	Remark            string     `json:"remark"`
 	Version           *int       `json:"version,omitempty"`
-	UpdatedBy         string     `json:"updatedBy"`
+	// Ignored. The actor written to created_by and changed_by comes from the
+	// authenticated session, never from the request body (requirement
+	// section 8), so this field is unreachable from JSON and is kept only for
+	// callers inside the process, such as the seeder.
+	UpdatedBy string `json:"-"`
 }
 
 // Validate applies the rules that do not need the database.
@@ -175,7 +183,11 @@ type PackagingTypeInput struct {
 	IsBulk       bool    `json:"isBulk"`
 	Status       string  `json:"status"`
 	Version      *int    `json:"version,omitempty"`
-	UpdatedBy    string  `json:"updatedBy"`
+	// Ignored. The actor written to created_by and changed_by comes from the
+	// authenticated session, never from the request body (requirement
+	// section 8), so this field is unreachable from JSON and is kept only for
+	// callers inside the process, such as the seeder.
+	UpdatedBy string `json:"-"`
 
 	// weightInTon is computed by Validate.
 	weightInTon float64
@@ -239,7 +251,11 @@ type ThresholdBandsInput struct {
 	// FactoryID of zero maintains the global default set.
 	FactoryID int64                `json:"factoryId"`
 	Bands     []ThresholdBandInput `json:"bands"`
-	UpdatedBy string               `json:"updatedBy"`
+	// Ignored. The actor written to created_by and changed_by comes from the
+	// authenticated session, never from the request body (requirement
+	// section 8), so this field is unreachable from JSON and is kept only for
+	// callers inside the process, such as the seeder.
+	UpdatedBy string `json:"-"`
 }
 
 // ThresholdBandInput is one alert band.

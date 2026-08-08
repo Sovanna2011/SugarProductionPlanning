@@ -15,6 +15,9 @@ import (
 // Store holds the connection pool.
 type Store struct {
 	pool *pgxpool.Pool
+	// systemActor caches the id of the SYSTEM account, which every audit
+	// column falls back to. See audit.go.
+	systemActor actorCache
 }
 
 // New opens a pool against the given DSN and verifies it.

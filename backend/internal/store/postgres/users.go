@@ -131,7 +131,7 @@ func (s *Store) PasswordDigest(ctx context.Context, userID int64) (string, error
 
 // InsertUser creates an account. An empty digest creates an account that
 // cannot sign in yet.
-func (s *Store) InsertUser(ctx context.Context, u domain.User, digest, actor string) (domain.User, error) {
+func (s *Store) InsertUser(ctx context.Context, u domain.User, digest string) (domain.User, error) {
 	var hash *string
 	if digest != "" {
 		hash = &digest
@@ -142,10 +142,15 @@ func (s *Store) InsertUser(ctx context.Context, u domain.User, digest, actor str
 		changedAt = &now
 	}
 
+	actor, err := s.ActorID(ctx)
+	if err != nil {
+		return domain.User{}, err
+	}
+
 	rows, err := s.pool.Query(ctx, `
 		INSERT INTO app_users (username, display_name, email, password_hash, roles,
 		                       status, must_change_password, is_demo, password_changed_at,
-		                       remark, created_by, updated_by)
+		                       remark, created_by, changed_by)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11)
 		RETURNING `+userColumnsBare,
 		strings.ToLower(strings.TrimSpace(u.Username)), u.DisplayName, u.Email, hash, u.Roles,
@@ -161,7 +166,12 @@ func (s *Store) InsertUser(ctx context.Context, u domain.User, digest, actor str
 //
 // Roles, status and display fields are here; the password is not — it moves
 // only through SetPassword, so every change to it is one code path.
-func (s *Store) UpdateUser(ctx context.Context, u domain.User, actor string) (domain.User, error) {
+func (s *Store) UpdateUser(ctx context.Context, u domain.User) (domain.User, error) {
+	actor, err := s.ActorID(ctx)
+	if err != nil {
+		return domain.User{}, err
+	}
+
 	rows, err := s.pool.Query(ctx, `
 		UPDATE app_users u
 		SET display_name = $2,
@@ -169,8 +179,7 @@ func (s *Store) UpdateUser(ctx context.Context, u domain.User, actor string) (do
 		    roles        = $4,
 		    status       = $5,
 		    remark       = $6,
-		    updated_at   = now(),
-		    updated_by   = $7,
+		    changed_by   = $7,
 		    version      = version + 1
 		WHERE u.id = $1 AND u.version = $8
 		RETURNING `+userColumns,
@@ -186,7 +195,12 @@ func (s *Store) UpdateUser(ctx context.Context, u domain.User, actor string) (do
 // Every existing session for the user is revoked in the same transaction: a
 // password change that leaves the old sessions alive does not achieve what the
 // person changing it believes it achieves.
-func (s *Store) SetPassword(ctx context.Context, userID int64, digest string, mustChange bool, actor string) error {
+func (s *Store) SetPassword(ctx context.Context, userID int64, digest string, mustChange bool) error {
+	actor, err := s.ActorID(ctx)
+	if err != nil {
+		return err
+	}
+
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -200,8 +214,7 @@ func (s *Store) SetPassword(ctx context.Context, userID int64, digest string, mu
 		    password_changed_at  = now(),
 		    failed_attempts      = 0,
 		    locked_until         = NULL,
-		    updated_at           = now(),
-		    updated_by           = $4,
+		    changed_by           = $4,
 		    version              = version + 1
 		WHERE id = $1`, userID, digest, mustChange, actor)
 	if err != nil {

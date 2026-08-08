@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"github.com/sovanna2011/sugarproductionplanning/backend/internal/auth"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -184,7 +185,9 @@ type NewMovement struct {
 	Remark                 string
 	CapacityOverride       bool
 	CapacityOverrideReason string
-	CreatedBy              string
+	// PostedBy is the name on the document, not the audit actor. It is used
+	// only when the request carries no identity at all.
+	PostedBy string
 }
 
 // PostMovement writes the ledger line and applies it to the balance in one
@@ -200,10 +203,17 @@ func (s *Store) PostMovement(ctx context.Context, m NewMovement) (int64, error) 
 	}
 	defer tx.Rollback(ctx)
 
-	actor := m.CreatedBy
-	if actor == "" {
-		actor = "SYSTEM"
+	// Two different things, and conflating them is how an audit trail stops
+	// being an audit trail. posted_by is business data — the name on the
+	// document, part of what the movement *says*. created_by is the audit
+	// column: which account wrote this row. They agree on every posting made
+	// through the UI and would differ the moment a correction is keyed in on
+	// somebody's behalf, which is exactly when it matters.
+	actor, err := s.ActorID(ctx)
+	if err != nil {
+		return 0, err
 	}
+	postedBy := auth.Actor(ctx, m.PostedBy)
 
 	var id int64
 	err = tx.QueryRow(ctx, `
@@ -214,14 +224,14 @@ func (s *Store) PostMovement(ctx context.Context, m NewMovement) (int64, error) 
 			transfer_ref, reference_doc, remark,
 			posted, posted_at, posted_by,
 			capacity_override, capacity_override_reason,
-			created_by, updated_by)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,TRUE,now(),$14,$15,$16,$14,$14)
+			created_by, changed_by)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,TRUE,now(),$14,$15,$16,$17,$17)
 		RETURNING id`,
 		m.FactoryID, m.MovementDate, m.MovementTypeID, m.StorageLocationID,
 		m.ProductID, m.PackagingTypeID, m.BatchNo,
 		m.PackageQty, m.WeightQty, m.WeightUOMID,
 		m.TransferRef, m.ReferenceDoc, m.Remark,
-		actor, m.CapacityOverride, m.CapacityOverrideReason).Scan(&id)
+		postedBy, m.CapacityOverride, m.CapacityOverrideReason, actor).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("insert movement: %w", err)
 	}
@@ -230,7 +240,7 @@ func (s *Store) PostMovement(ctx context.Context, m NewMovement) (int64, error) 
 		INSERT INTO inventory_balances (
 			factory_id, storage_location_id, product_id, packaging_type_id, batch_no,
 			package_quantity, weight_quantity, weight_uom_id, last_movement_date,
-			created_by, updated_by)
+			created_by, changed_by)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$10)
 		ON CONFLICT (storage_location_id, product_id, packaging_type_id, batch_no)
 		DO UPDATE SET
@@ -239,8 +249,7 @@ func (s *Store) PostMovement(ctx context.Context, m NewMovement) (int64, error) 
 			last_movement_date = GREATEST(
 				COALESCE(inventory_balances.last_movement_date, EXCLUDED.last_movement_date),
 				EXCLUDED.last_movement_date),
-			updated_at = now(),
-			updated_by = EXCLUDED.updated_by,
+			changed_by = EXCLUDED.changed_by,
 			version    = inventory_balances.version + 1`,
 		m.FactoryID, m.StorageLocationID, m.ProductID, m.PackagingTypeID, m.BatchNo,
 		m.PackageQty, m.WeightQty, m.WeightUOMID, m.MovementDate, actor)

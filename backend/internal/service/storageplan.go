@@ -8,7 +8,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/sovanna2011/sugarproductionplanning/backend/internal/auth"
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/capacity"
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/domain"
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/store/postgres"
@@ -40,9 +39,13 @@ type StoragePlanLineInput struct {
 	PlannedInPackages  float64  `json:"plannedInPackages"`
 	PlannedOutPackages float64  `json:"plannedOutPackages"`
 
-	Status    string `json:"status"`
-	Remark    string `json:"remark"`
-	UpdatedBy string `json:"updatedBy"`
+	Status string `json:"status"`
+	Remark string `json:"remark"`
+	// Ignored. The actor written to created_by and changed_by comes from the
+	// authenticated session, never from the request body (requirement
+	// section 8), so this field is unreachable from JSON and is kept only for
+	// callers inside the process, such as the seeder.
+	UpdatedBy string `json:"-"`
 }
 
 // Validate applies the rules that do not need the database.
@@ -196,7 +199,6 @@ func (s *Service) SaveStoragePlanLine(ctx context.Context, in StoragePlanLineInp
 		WeightUOMID:          uomID,
 		Status:               in.Status,
 		Remark:               in.Remark,
-		UpdatedBy:            auth.Actor(ctx, in.UpdatedBy),
 	}); err != nil {
 		return StoragePlanResult{}, err
 	}

@@ -1,0 +1,73 @@
+<core:FragmentDefinition
+	xmlns="sap.m"
+	xmlns:core="sap.ui.core"
+	xmlns:f="sap.ui.layout.form">
+
+	<!--
+		Administrative Information (requirement section 9).
+
+		The four audit fields, on every object page that has them. They are
+		read-only in the strongest sense available: these are Text controls,
+		not disabled Inputs, so there is no field to re-enable in the
+		developer tools and nothing for the client to send back. The server
+		would ignore it if there were, and the database would overwrite it
+		after that, but a screen that looks editable invites the attempt and
+		then has to explain the refusal.
+
+		Shown only once a record exists. On a new object the panel would have
+		four blanks and a reader would wonder what had failed to load.
+	-->
+	<Panel
+		id="adminInfoPanel"
+		expandable="true"
+		expanded="false"
+		visible="{= !!${edit>/audit/createdAt} }"
+		headerText="{i18n>adminInfo}"
+		class="sapUiNoContentPadding">
+
+		<f:SimpleForm
+			layout="ResponsiveGridLayout"
+			editable="false"
+			labelSpanXL="4" labelSpanL="4" labelSpanM="4" labelSpanS="12"
+			columnsXL="1" columnsL="1">
+			<f:content>
+
+				<Label text="{i18n>createdBy}"/>
+				<Text text="{
+					parts: ['edit>/audit/createdByName', 'edit>/audit/createdBy'],
+					formatter: '.formatter.auditUser'
+				}"/>
+
+				<Label text="{i18n>createdAt}"/>
+				<Text text="{
+					parts: ['edit>/audit/createdAt', 'app>/config/businessTimezone'],
+					formatter: '.formatter.auditTime'
+				}"/>
+
+				<Label text="{i18n>changedBy}"/>
+				<Text text="{
+					parts: ['edit>/audit/changedByName', 'edit>/audit/changedBy'],
+					formatter: '.formatter.auditUser'
+				}"/>
+
+				<Label text="{i18n>changedAt}"/>
+				<Text text="{
+					parts: ['edit>/audit/changedAt', 'app>/config/businessTimezone'],
+					formatter: '.formatter.auditTime'
+				}"/>
+
+			</f:content>
+		</f:SimpleForm>
+
+		<!--
+			Which clock these times are on. Without it the panel is a set of
+			numbers whose meaning depends on where the reader is sitting, and
+			the whole point of configuring a business timezone is that it does
+			not.
+		-->
+		<Text
+			class="sapUiTinyMarginBegin sapUiTinyMarginBottom"
+			text="{i18n>auditZoneHint} {app>/config/businessTimezone}"/>
+
+	</Panel>
+</core:FragmentDefinition>

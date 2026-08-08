@@ -18,6 +18,56 @@ sap.ui.define([], function () {
 	var formatter = {
 
 		/**
+		 * An audit timestamp, rendered in the factory's own timezone.
+		 *
+		 * The value on the wire is an instant (RFC 3339 with an offset), so it
+		 * is unambiguous. What is ambiguous is which *day* it belongs to, and
+		 * that is a question about the factory, not about whoever is reading:
+		 * a posting made at 06:30 in Kampong Speu is 23:30 the previous day in
+		 * London, and a browser left to answer for itself would file it under
+		 * the wrong day's production while showing a perfectly correct time.
+		 *
+		 * So the zone comes from GET /api/v1/system/config, and every audit
+		 * timestamp on every screen is rendered in it. The zone is named in
+		 * the output rather than assumed, because a reader somewhere else
+		 * needs to know which clock they are looking at.
+		 */
+		auditTime: function (value, timezone) {
+			if (!value) {
+				return "";
+			}
+			var when = value instanceof Date ? value : new Date(value);
+			if (isNaN(when.getTime())) {
+				return String(value);
+			}
+			var zone = timezone || "Asia/Phnom_Penh";
+			try {
+				return new Intl.DateTimeFormat("en-GB", {
+					timeZone: zone,
+					day: "2-digit", month: "short", year: "numeric",
+					hour: "2-digit", minute: "2-digit", second: "2-digit",
+					hour12: false
+				}).format(when).replace(",", "");
+			} catch (e) {
+				// An unknown zone must not blank the field: showing the
+				// instant in UTC and saying so beats showing nothing.
+				return when.toISOString().replace("T", " ").slice(0, 19) + " UTC";
+			}
+		},
+
+		/**
+		 * "SOVANNA" from the user master, falling back to the id when the
+		 * name has not been resolved — never blank, because a blank author
+		 * reads as "nobody did this".
+		 */
+		auditUser: function (name, id) {
+			if (name) {
+				return name;
+			}
+			return id ? "#" + id : "";
+		},
+
+		/**
 		 * A percentage for display, e.g. "82.5%".
 		 */
 		percent: function (value) {

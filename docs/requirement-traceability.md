@@ -65,3 +65,32 @@ the site rather than screens in the application, and one route-to-role table
 enforcing them. **With the mode left at its `none` default nothing is
 enforced**, so the requirement's own behaviour is unchanged unless a deployment
 opts in. See [`security.md`](security.md).
+
+**Mandatory audit fields** (requirement update, August 2026). Every table now
+carries `created_by`, `created_at`, `changed_by`, `changed_at`. The columns
+already existed on eighteen of twenty-one tables under the names
+`created_by`/`updated_by`, holding a username as text — so most of this was a
+rename and a type change rather than an addition. Three deliberate choices are
+worth knowing about before reading the migration:
+
+- **The `_by` columns are foreign keys to `app_users`, not usernames.** Text
+  cannot be joined and goes stale on a rename. Non-user actors from before the
+  change — the seeder, the migrations, the test suite — map to a real `SYSTEM`
+  account, and the original text is kept in `created_by_legacy` because *which*
+  system actor wrote a row is worth knowing when the figure turns out to be
+  wrong.
+- **The database enforces it, not the application.** A `BEFORE` trigger stamps
+  both timestamps from the server clock and restores `created_by`/`created_at`
+  on every update, so the guarantee survives a repository that forgets, a
+  hand-typed `UPDATE`, and any second application that never read the code.
+- **`schema_migrations` is exempt, and the exemption is named in the guard.**
+  It records the migration that creates `app_users`, so it cannot reference it.
+
+Full detail, including the mapping from the requirement's table names onto the
+ones this system actually has, is in [`audit-fields.md`](audit-fields.md).
+
+**The central audit log is specified but not built.** The four fields answer
+who changed a record and when; they do not answer what changed from what to
+what. That is a separate table and a separate piece of work, and calling it
+done because the four fields exist would be the sort of half-truth this
+document is meant to avoid.

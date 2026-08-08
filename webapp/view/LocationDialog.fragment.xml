@@ -75,6 +75,8 @@
 				</f:content>
 			</f:SimpleForm>
 
+			<core:Fragment fragmentName="kss.spp.view.AdminInfo" type="XML"/>
+
 			<!-- Only offered once the server has refused a shrink. -->
 			<MessageStrip
 				class="sapUiSmallMargin"

@@ -103,6 +103,16 @@ func (i Identity) HasAnyRole(roles ...string) bool {
 type Identity struct {
 	// Subject is the stable identifier recorded in the audit trail.
 	Subject string
+	// UserID is the row in app_users this identity is, when the mechanism
+	// knows it. The audit columns are foreign keys to that table, so this is
+	// what gets written to created_by and changed_by — the name is for
+	// reading, the id is for joining.
+	//
+	// It is zero under the proxy and none modes, which authenticate against
+	// something outside the user table (or not at all). Writes made under
+	// those modes are attributed to the SYSTEM account, which is the honest
+	// answer rather than a guess.
+	UserID int64
 	// Name is a display name when the mechanism supplies one.
 	Name string
 	// Roles carries the group membership the mechanism supplies. See

@@ -124,7 +124,7 @@ func account(t *testing.T, store *postgres.Store, ctx context.Context, username,
 		Roles:       roles,
 		Status:      domain.StatusActive,
 		Remark:      "created by the integration tests",
-	}, digest, "test")
+	}, digest)
 	if err != nil {
 		t.Fatalf("create %s: %v", username, err)
 	}

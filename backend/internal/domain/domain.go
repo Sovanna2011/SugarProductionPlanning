@@ -90,6 +90,27 @@ type StorageType struct {
 	Description    string `json:"description"`
 }
 
+// Audit is the four mandatory fields every table carries, as they are read
+// back for display.
+//
+// It is embedded rather than repeated so that a new entity gets them by
+// declaring one field, and so that a screen showing them can be written once
+// against one shape. The names come from the user master through a join, not
+// from a copy stored beside the ids, so renaming somebody corrects every
+// screen that ever showed them.
+//
+// Nothing here is settable from a request. The API accepts no value for any of
+// these, and the database overwrites the timestamps regardless — see
+// docs/audit-fields.md.
+type Audit struct {
+	CreatedBy     int64     `json:"createdBy"`
+	CreatedByName string    `json:"createdByName"`
+	CreatedAt     time.Time `json:"createdAt"`
+	ChangedBy     int64     `json:"changedBy"`
+	ChangedByName string    `json:"changedByName"`
+	ChangedAt     time.Time `json:"changedAt"`
+}
+
 // StorageLocation is a tank, silo or warehouse (requirement section 3).
 type StorageLocation struct {
 	ID                     int64      `json:"id"`
@@ -112,6 +133,7 @@ type StorageLocation struct {
 	Remark                 string     `json:"remark"`
 	// Version supports optimistic locking on update.
 	Version int `json:"version"`
+	Audit   `json:"audit"`
 }
 
 // StorageGroup is a pool of locations planned against one shared ceiling.

@@ -34,7 +34,6 @@ type UpsertStorageLocation struct {
 	EffectiveTo            *time.Time
 	Remark                 string
 	Version                *int
-	UpdatedBy              string
 }
 
 // SaveStorageLocation inserts a new location or updates an existing one.
@@ -42,9 +41,9 @@ type UpsertStorageLocation struct {
 // An update requires the caller's version to match, so two people editing the
 // same warehouse cannot silently overwrite each other.
 func (s *Store) SaveStorageLocation(ctx context.Context, in UpsertStorageLocation) (int64, error) {
-	actor := in.UpdatedBy
-	if actor == "" {
-		actor = "SYSTEM"
+	actor, err := s.ActorID(ctx)
+	if err != nil {
+		return 0, err
 	}
 	from := time.Date(1900, 1, 1, 0, 0, 0, 0, time.UTC)
 	if in.EffectiveFrom != nil {
@@ -58,7 +57,7 @@ func (s *Store) SaveStorageLocation(ctx context.Context, in UpsertStorageLocatio
 				factory_id, storage_code, storage_name, storage_type_id,
 				physical_capacity, capacity_uom_id, minimum_stock_level,
 				safe_capacity_percentage, allow_mixed_products, allow_mixed_batches,
-				status, effective_from, effective_to, remark, created_by, updated_by)
+				status, effective_from, effective_to, remark, created_by, changed_by)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15)
 			RETURNING id`,
 			in.FactoryID, in.StorageCode, in.StorageName, in.StorageTypeID,
@@ -72,13 +71,13 @@ func (s *Store) SaveStorageLocation(ctx context.Context, in UpsertStorageLocatio
 	}
 
 	var id int64
-	err := s.pool.QueryRow(ctx, `
+	err = s.pool.QueryRow(ctx, `
 		UPDATE storage_locations SET
 			storage_name = $3, storage_type_id = $4,
 			physical_capacity = $5, capacity_uom_id = $6, minimum_stock_level = $7,
 			safe_capacity_percentage = $8, allow_mixed_products = $9, allow_mixed_batches = $10,
 			status = $11, effective_from = $12, effective_to = $13, remark = $14,
-			updated_at = now(), updated_by = $15, version = version + 1
+			changed_by = $15, version = version + 1
 		WHERE factory_id = $1 AND storage_code = $2 AND version = $16
 		RETURNING id`,
 		in.FactoryID, in.StorageCode, in.StorageName, in.StorageTypeID,
@@ -111,15 +110,14 @@ type UpsertStorageProductCapacity struct {
 	Status            string
 	Remark            string
 	Version           *int
-	UpdatedBy         string
 }
 
 // SaveStorageProductCapacity inserts or updates one cell of the capacity
 // matrix, keyed by location + product + packaging + effective_from.
 func (s *Store) SaveStorageProductCapacity(ctx context.Context, in UpsertStorageProductCapacity) (int64, error) {
-	actor := in.UpdatedBy
-	if actor == "" {
-		actor = "SYSTEM"
+	actor, err := s.ActorID(ctx)
+	if err != nil {
+		return 0, err
 	}
 	from := time.Date(1900, 1, 1, 0, 0, 0, 0, time.UTC)
 	if in.EffectiveFrom != nil {
@@ -133,7 +131,7 @@ func (s *Store) SaveStorageProductCapacity(ctx context.Context, in UpsertStorage
 				storage_location_id, product_id, packaging_type_id,
 				maximum_package_quantity, maximum_weight_quantity, weight_uom_id,
 				minimum_stock_quantity, maximum_safe_quantity,
-				effective_from, effective_to, status, remark, created_by, updated_by)
+				effective_from, effective_to, status, remark, created_by, changed_by)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$13)
 			RETURNING id`,
 			in.StorageLocationID, in.ProductID, in.PackagingTypeID,
@@ -147,12 +145,12 @@ func (s *Store) SaveStorageProductCapacity(ctx context.Context, in UpsertStorage
 	}
 
 	var id int64
-	err := s.pool.QueryRow(ctx, `
+	err = s.pool.QueryRow(ctx, `
 		UPDATE storage_product_capacity SET
 			maximum_package_quantity = $4, maximum_weight_quantity = $5, weight_uom_id = $6,
 			minimum_stock_quantity = $7, maximum_safe_quantity = $8,
 			effective_to = $9, status = $10, remark = $11,
-			updated_at = now(), updated_by = $12, version = version + 1
+			changed_by = $12, version = version + 1
 		WHERE storage_location_id = $1 AND product_id = $2 AND packaging_type_id = $3
 		  AND effective_from = $13 AND version = $14
 		RETURNING id`,
@@ -183,14 +181,13 @@ type UpsertPackagingType struct {
 	IsBulk         bool
 	Status         string
 	Version        *int
-	UpdatedBy      string
 }
 
 // SavePackagingType inserts or updates a packaging master row.
 func (s *Store) SavePackagingType(ctx context.Context, in UpsertPackagingType) (int64, error) {
-	actor := in.UpdatedBy
-	if actor == "" {
-		actor = "SYSTEM"
+	actor, err := s.ActorID(ctx)
+	if err != nil {
+		return 0, err
 	}
 
 	if in.Version == nil {
@@ -198,7 +195,7 @@ func (s *Store) SavePackagingType(ctx context.Context, in UpsertPackagingType) (
 		err := s.pool.QueryRow(ctx, `
 			INSERT INTO packaging_types (
 				code, description, net_weight, net_weight_uom_id, weight_in_ton,
-				is_bulk, status, created_by, updated_by)
+				is_bulk, status, created_by, changed_by)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8)
 			RETURNING id`,
 			in.Code, in.Description, in.NetWeight, in.NetWeightUOMID, in.WeightInTon,
@@ -210,10 +207,10 @@ func (s *Store) SavePackagingType(ctx context.Context, in UpsertPackagingType) (
 	}
 
 	var id int64
-	err := s.pool.QueryRow(ctx, `
+	err = s.pool.QueryRow(ctx, `
 		UPDATE packaging_types SET
 			description = $2, net_weight = $3, net_weight_uom_id = $4, weight_in_ton = $5,
-			is_bulk = $6, status = $7, updated_at = now(), updated_by = $8,
+			is_bulk = $6, status = $7, changed_by = $8,
 			version = version + 1
 		WHERE code = $1 AND version = $9
 		RETURNING id`,
@@ -245,10 +242,10 @@ type ThresholdBandRow struct {
 // replaced together rather than edited one at a time.
 //
 // factoryID of zero maintains the global default set.
-func (s *Store) ReplaceThresholdBands(ctx context.Context, factoryID int64, bands []ThresholdBandRow, updatedBy string) error {
-	actor := updatedBy
-	if actor == "" {
-		actor = "SYSTEM"
+func (s *Store) ReplaceThresholdBands(ctx context.Context, factoryID int64, bands []ThresholdBandRow) error {
+	actor, err := s.ActorID(ctx)
+	if err != nil {
+		return err
 	}
 
 	tx, err := s.pool.Begin(ctx)
@@ -272,7 +269,7 @@ func (s *Store) ReplaceThresholdBands(ctx context.Context, factoryID int64, band
 		if _, err := tx.Exec(ctx, `
 			INSERT INTO capacity_threshold_levels (
 				factory_id, code, name, from_percentage, to_percentage,
-				severity, ui_state, sort_order, created_by, updated_by)
+				severity, ui_state, sort_order, created_by, changed_by)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$9)`,
 			factory, b.Code, b.Name, b.From, b.To, b.Severity, b.UIState, (i+1)*10, actor); err != nil {
 			return fmt.Errorf("insert threshold band %s: %w", b.Code, err)

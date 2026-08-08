@@ -35,7 +35,11 @@ type MovementRequest struct {
 	// (requirement section 24.5). It requires a reason.
 	Override       bool   `json:"override"`
 	OverrideReason string `json:"overrideReason"`
-	PostedBy       string `json:"postedBy"`
+	// Ignored. The actor written to created_by and changed_by comes from the
+	// authenticated session, never from the request body (requirement
+	// section 8), so this field is unreachable from JSON and is kept only for
+	// callers inside the process, such as the seeder.
+	PostedBy string `json:"-"`
 }
 
 // MovementResponse reports what validation found and, when posted, the id of
@@ -301,7 +305,6 @@ func (s *Service) prepare(ctx context.Context, req MovementRequest) (postgres.Ne
 		Remark:                 req.Remark,
 		CapacityOverride:       req.Override && !resp.Validation.Allowed,
 		CapacityOverrideReason: req.OverrideReason,
-		CreatedBy:              auth.Actor(ctx, req.PostedBy),
 	}
 	if !out.CapacityOverride {
 		out.CapacityOverrideReason = ""

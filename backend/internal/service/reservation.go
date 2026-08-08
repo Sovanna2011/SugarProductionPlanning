@@ -8,7 +8,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/sovanna2011/sugarproductionplanning/backend/internal/auth"
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/capacity"
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/store/postgres"
 )
@@ -28,7 +27,11 @@ type ReservationRequest struct {
 	PackageQuantity *float64 `json:"packageQuantity,omitempty"`
 	WeightQuantity  *float64 `json:"weightQuantity,omitempty"`
 	ReferenceDoc    string   `json:"referenceDoc"`
-	UpdatedBy       string   `json:"updatedBy"`
+	// Ignored. The actor written to created_by and changed_by comes from the
+	// authenticated session, never from the request body (requirement
+	// section 8), so this field is unreachable from JSON and is kept only for
+	// callers inside the process, such as the seeder.
+	UpdatedBy string `json:"-"`
 }
 
 // ReservationResult reports the position after reserving or releasing.
@@ -101,7 +104,6 @@ func (s *Service) adjustReservation(ctx context.Context, req ReservationRequest,
 		BatchNo:           req.BatchNo,
 		DeltaPackages:     sign * qty.Packages,
 		DeltaWeight:       sign * qty.Weight,
-		UpdatedBy:         auth.Actor(ctx, req.UpdatedBy),
 	})
 	if err != nil {
 		if errors.Is(err, postgres.ErrInsufficientStock) {

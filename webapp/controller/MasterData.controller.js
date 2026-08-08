@@ -50,7 +50,12 @@ sap.ui.define([
 				this.get("master/packaging-types"),
 				this.get("master/threshold-levels" + sQuery),
 				this.get("master/storage-types"),
-				this.get("master/products")
+				this.get("master/products"),
+				// The business timezone every audit timestamp is rendered in.
+				// Fetched rather than assumed: the browser's own zone is
+				// whatever the machine was set to, and on a shared factory PC
+				// that is not evidence of anything.
+				this.get("system/config")
 			]).then(function (a) {
 				that._model.setProperty("/master/storageLocations", a[0]);
 				that._model.setProperty("/master/capacities", a[1]);
@@ -65,6 +70,7 @@ sap.ui.define([
 				that._model.setProperty("/master/storageTypes", a[4]);
 				that._model.setProperty("/master/products", a[5]);
 				that._model.setProperty("/master/packagingTypes", a[2]);
+				that._model.setProperty("/config", a[6]);
 			}).catch(function (err) {
 				that.showError(err);
 			}).finally(function () {
@@ -163,6 +169,11 @@ sap.ui.define([
 				allowMixedBatches: o.allowMixedBatches,
 				status: o.status,
 				remark: o.remark,
+				// Read straight through to the panel. Nothing on the way back
+				// to the server carries it: onSaveLocation builds its payload
+				// field by field, and the audit block is not one of the
+				// fields it names.
+				audit: o.audit,
 				showForce: false,
 				force: false
 			});

@@ -472,7 +472,6 @@ func TestMasterDataRoundTrip(t *testing.T) {
 		PhysicalCapacity:       12_000,
 		SafeCapacityPercentage: 90,
 		AllowMixedProducts:     true,
-		UpdatedBy:              "integration-test",
 	})
 	if err != nil {
 		t.Fatalf("create location: %v", err)
@@ -503,7 +502,6 @@ func TestMasterDataRoundTrip(t *testing.T) {
 		PackagingCode:     "PKG-50KG",
 		MaximumPackageQty: ptrFloat(100_000),
 		MaximumWeightQty:  ptrFloat(5_000),
-		UpdatedBy:         "integration-test",
 	}); err != nil {
 		t.Fatalf("create capacity: %v", err)
 	}
@@ -538,7 +536,7 @@ func TestOptimisticLockingRejectsAStaleUpdate(t *testing.T) {
 			FactoryID: factoryID, StorageCode: code, StorageName: "Locking Test",
 			StorageTypeCode:  "FINISHED_GOODS_WAREHOUSE",
 			PhysicalCapacity: capacity, SafeCapacityPercentage: 95,
-			Version: version, UpdatedBy: "integration-test",
+			Version: version,
 		}
 	}
 
@@ -601,7 +599,7 @@ func TestReservationsBoundAvailableStock(t *testing.T) {
 		return svc.Reserve(ctx, service.ReservationRequest{
 			FactoryID: factoryID, StorageCode: "FG-WH01",
 			ProductCode: "REFINED-SUGAR", PackagingCode: "PKG-50KG",
-			BatchNo: batch, WeightQuantity: ptrFloat(weight), UpdatedBy: "integration-test",
+			BatchNo: batch, WeightQuantity: ptrFloat(weight),
 		})
 	}
 
@@ -668,9 +666,9 @@ func TestStoragePlanCarriesOpeningForward(t *testing.T) {
 			OpeningWeight: ptrFloat(500), PlannedInWeight: 400, PlannedOutWeight: 300,
 			UpdatedBy: "integration-test"},
 		{FactoryID: factoryID, PlanDate: day1.AddDate(0, 0, 1), ScopeCode: "CON-S01",
-			PlannedInWeight: 400, PlannedOutWeight: 300, UpdatedBy: "integration-test"},
+			PlannedInWeight: 400, PlannedOutWeight: 300},
 		{FactoryID: factoryID, PlanDate: day1.AddDate(0, 0, 2), ScopeCode: "CON-S01",
-			PlannedInWeight: 400, PlannedOutWeight: 300, UpdatedBy: "integration-test"},
+			PlannedInWeight: 400, PlannedOutWeight: 300},
 	})
 	if err != nil {
 		t.Fatalf("save plan: %v", err)

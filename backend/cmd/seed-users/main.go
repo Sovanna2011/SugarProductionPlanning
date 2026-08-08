@@ -112,7 +112,7 @@ func seedDemo(ctx context.Context, store *postgres.Store, reset bool) error {
 			// flagged to change it: the point is to sign in and use the
 			// system, and a forced change on every login makes the fixture
 			// useless.
-			if err := store.SetPassword(ctx, existing.ID, digest, false, "seed-users"); err != nil {
+			if err := store.SetPassword(ctx, existing.ID, digest, false); err != nil {
 				return err
 			}
 			fmt.Fprintf(w, "%s\t%s\t%s\n", a.Username, strings.Join(existing.Roles, " "), a.Remark)
@@ -129,7 +129,7 @@ func seedDemo(ctx context.Context, store *postgres.Store, reset bool) error {
 			Status:      domain.StatusActive,
 			IsDemo:      true,
 			Remark:      a.Remark,
-		}, digest, "seed-users")
+		}, digest)
 		if err != nil {
 			return fmt.Errorf("create %s: %w", a.Username, err)
 		}
@@ -157,7 +157,7 @@ func deactivateDemo(ctx context.Context, store *postgres.Store) error {
 			continue
 		}
 		u.Status = domain.StatusInactive
-		if _, err := store.UpdateUser(ctx, u, "seed-users"); err != nil {
+		if _, err := store.UpdateUser(ctx, u); err != nil {
 			return fmt.Errorf("deactivate %s: %w", u.Username, err)
 		}
 		if _, err := store.RevokeUserSessions(ctx, u.ID); err != nil {
@@ -204,7 +204,7 @@ func seedAdmin(ctx context.Context, store *postgres.Store, username, display, pa
 	case err == nil:
 		// A password an administrator typed for somebody else is flagged for
 		// change at first sign-in, whoever they are.
-		if err := store.SetPassword(ctx, existing.ID, digest, true, "seed-users"); err != nil {
+		if err := store.SetPassword(ctx, existing.ID, digest, true); err != nil {
 			return err
 		}
 		fmt.Printf("Password reset for %s.\n", username)
@@ -216,7 +216,7 @@ func seedAdmin(ctx context.Context, store *postgres.Store, username, display, pa
 			Status:             domain.StatusActive,
 			MustChangePassword: true,
 			Remark:             "Created by spp-seed-users",
-		}, digest, "seed-users"); err != nil {
+		}, digest); err != nil {
 			return fmt.Errorf("create %s: %w", username, err)
 		}
 		fmt.Printf("Administrator %s created.\n", username)

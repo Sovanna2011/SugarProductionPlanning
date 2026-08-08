@@ -24,7 +24,6 @@ type ReservationAdjustment struct {
 	BatchNo           string
 	DeltaPackages     float64
 	DeltaWeight       float64
-	UpdatedBy         string
 }
 
 // AdjustReservation changes the reserved quantity on a balance and returns the
@@ -84,15 +83,15 @@ func (s *Store) AdjustReservation(ctx context.Context, in ReservationAdjustment)
 			ErrInsufficientStock, packages, resPackages, packages-resPackages)
 	}
 
-	actor := in.UpdatedBy
-	if actor == "" {
-		actor = "SYSTEM"
+	actor, err := s.ActorID(ctx)
+	if err != nil {
+		return applied, balance, err
 	}
 	if _, err := tx.Exec(ctx, `
 		UPDATE inventory_balances SET
 			reserved_package_quantity = $2,
 			reserved_weight_quantity  = $3,
-			updated_at = now(), updated_by = $4, version = version + 1
+			changed_by = $4, version = version + 1
 		WHERE id = $1`, id, newResPackages, newResWeight, actor); err != nil {
 		return applied, balance, fmt.Errorf("update reservation: %w", err)
 	}

@@ -69,6 +69,7 @@ func (a *API) Routes() http.Handler {
 	// Signing in. auth/config and auth/login are reachable without a session,
 	// because a browser has to ask both before anyone has one.
 	mux.HandleFunc("GET /api/v1/auth/config", a.authConfigHandler)
+	mux.HandleFunc("GET /api/v1/system/config", a.systemConfig)
 	mux.HandleFunc("POST /api/v1/auth/login", a.login)
 	mux.HandleFunc("POST /api/v1/auth/logout", a.logout)
 	mux.HandleFunc("GET /api/v1/auth/me", a.me)
@@ -521,4 +522,12 @@ func (a *API) alerts(w http.ResponseWriter, r *http.Request) {
 		}
 		return d.Alerts, nil
 	})
+}
+
+// systemConfig serves the settings the front end needs before it can render a
+// timestamp: which timezone the factory works in, and what the server clock
+// says. Both are read-only, and neither is negotiable from the client — the
+// point of the endpoint is that the browser stops being the authority.
+func (a *API) systemConfig(w http.ResponseWriter, r *http.Request) {
+	a.handle(w, r, func() (any, error) { return a.svc.SystemConfig(r.Context()) })
 }

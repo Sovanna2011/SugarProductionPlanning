@@ -190,6 +190,7 @@ func (s *Service) ResolveSession(ctx context.Context, token string) (auth.Identi
 	s.extendSession(ctx, session)
 
 	return auth.Identity{
+		UserID:             user.ID,
 		Subject:            user.Username,
 		Name:               user.DisplayName,
 		Roles:              user.Roles,
@@ -293,7 +294,7 @@ func (s *Service) ChangePassword(ctx context.Context, req ChangePasswordRequest)
 	// in again with the new password. That is the honest behaviour: it is also
 	// what makes a password change effective against somebody who already has
 	// a session.
-	return s.store.SetPassword(ctx, user.ID, newDigest, false, user.Username)
+	return s.store.SetPassword(ctx, user.ID, newDigest, false)
 }
 
 // --- user administration ----------------------------------------------------
@@ -474,7 +475,7 @@ func (s *Service) SaveUser(ctx context.Context, in UserInput) (UserSaveResult, e
 		Status:      in.Status,
 		Remark:      in.Remark,
 		Version:     in.Version,
-	}, actor)
+	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return UserSaveResult{}, fmt.Errorf(
@@ -532,7 +533,7 @@ func (s *Service) createUser(ctx context.Context, in UserInput, actor string) (U
 		Status:             in.Status,
 		MustChangePassword: true,
 		Remark:             in.Remark,
-	}, digest, actor)
+	}, digest)
 	if err != nil {
 		return UserSaveResult{}, err
 	}
@@ -581,7 +582,7 @@ func (s *Service) ResetPassword(ctx context.Context, req ResetPasswordRequest) (
 	if err != nil {
 		return UserSaveResult{}, err
 	}
-	if err := s.store.SetPassword(ctx, user.ID, digest, true, auth.Actor(ctx, "")); err != nil {
+	if err := s.store.SetPassword(ctx, user.ID, digest, true); err != nil {
 		return UserSaveResult{}, err
 	}
 

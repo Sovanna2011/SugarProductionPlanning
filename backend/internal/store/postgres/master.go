@@ -59,7 +59,9 @@ const storageLocationColumns = `
 	l.physical_capacity, u.code,
 	l.minimum_stock_level, l.safe_capacity_percentage,
 	l.allow_mixed_products, l.allow_mixed_batches,
-	l.status, l.effective_from, l.effective_to, l.remark, l.version`
+	l.status, l.effective_from, l.effective_to, l.remark, l.version,
+	l.created_by, COALESCE(NULLIF(cu.display_name,''), cu.username, ''), l.created_at,
+	l.changed_by, COALESCE(NULLIF(hu.display_name,''), hu.username, ''), l.changed_at`
 
 func scanStorageLocation(r pgx.Rows) (domain.StorageLocation, error) {
 	var v domain.StorageLocation
@@ -68,7 +70,9 @@ func scanStorageLocation(r pgx.Rows) (domain.StorageLocation, error) {
 		&v.PhysicalCapacity, &v.CapacityUOM,
 		&v.MinimumStockLevel, &v.SafeCapacityPercentage,
 		&v.AllowMixedProducts, &v.AllowMixedBatches,
-		&v.Status, &v.EffectiveFrom, &v.EffectiveTo, &v.Remark, &v.Version)
+		&v.Status, &v.EffectiveFrom, &v.EffectiveTo, &v.Remark, &v.Version,
+		&v.CreatedBy, &v.CreatedByName, &v.CreatedAt,
+		&v.ChangedBy, &v.ChangedByName, &v.ChangedAt)
 	return v, err
 }
 
@@ -93,6 +97,8 @@ func (s *Store) ListStorageLocations(ctx context.Context, f StorageLocationFilte
 		FROM storage_locations l
 		JOIN storage_types t ON t.id = l.storage_type_id
 		JOIN uoms u ON u.id = l.capacity_uom_id
+		LEFT JOIN app_users cu ON cu.id = l.created_by
+		LEFT JOIN app_users hu ON hu.id = l.changed_by
 		WHERE TRUE`+w.where()+`
 		ORDER BY t.code, l.storage_code`, w.args...)
 	if err != nil {
@@ -157,6 +163,8 @@ func (s *Store) ListStorageGroups(ctx context.Context, factoryID int64) ([]domai
 		JOIN storage_locations l ON l.id = m.storage_location_id
 		JOIN storage_types t ON t.id = l.storage_type_id
 		JOIN uoms u ON u.id = l.capacity_uom_id
+		LEFT JOIN app_users cu ON cu.id = l.created_by
+		LEFT JOIN app_users hu ON hu.id = l.changed_by
 		WHERE m.storage_group_id = ANY($1)
 		ORDER BY m.storage_group_id, l.storage_code`, ids)
 	if err != nil {
@@ -172,7 +180,9 @@ func (s *Store) ListStorageGroups(ctx context.Context, factoryID int64) ([]domai
 			&v.PhysicalCapacity, &v.CapacityUOM,
 			&v.MinimumStockLevel, &v.SafeCapacityPercentage,
 			&v.AllowMixedProducts, &v.AllowMixedBatches,
-			&v.Status, &v.EffectiveFrom, &v.EffectiveTo, &v.Remark, &v.Version); err != nil {
+			&v.Status, &v.EffectiveFrom, &v.EffectiveTo, &v.Remark, &v.Version,
+			&v.CreatedBy, &v.CreatedByName, &v.CreatedAt,
+			&v.ChangedBy, &v.ChangedByName, &v.ChangedAt); err != nil {
 			return nil, err
 		}
 		if g := byID[groupID]; g != nil {
