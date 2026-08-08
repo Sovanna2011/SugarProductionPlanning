@@ -1,0 +1,767 @@
+<title>Storage Capacity Console — Kampong Speu Sugar</title>
+
+<style>
+/* ── Tokens ────────────────────────────────────────────────────────────
+   Light is the base. Dark redefines only tokens, guarded so an explicit
+   light choice beats a dark OS, and stamped again so the toggle wins both
+   ways. Nothing below declares a colour outside this block.            */
+:root {
+  --ground:   #EBF0F3;
+  --surface:  #FFFFFF;
+  --raised:   #F5F8F9;
+  --line:     #D2DDE3;
+  --line-soft:#E3EAEE;
+  --ink:      #0E1A21;
+  --ink-2:    #3A4E5A;
+  --muted:    #647885;
+  --accent:   #0B8582;
+  --accent-2: #06635F;
+  --accent-wash: #E2F1F0;
+
+  --normal:   #3C8C4A;
+  --warning:  #A9710A;
+  --high:     #C2570F;
+  --critical: #B32C22;
+  --normal-wash:  #E6F1E7;
+  --warning-wash: #F8EEDA;
+  --high-wash:    #FAE8DC;
+  --critical-wash:#F8E2E0;
+
+  --shadow: 0 1px 2px rgba(14,26,33,.06), 0 8px 24px -12px rgba(14,26,33,.18);
+  --radius: 10px;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:   #090F14;
+    --surface:  #111A21;
+    --raised:   #16222A;
+    --line:     #24333D;
+    --line-soft:#1B2831;
+    --ink:      #E6EEF2;
+    --ink-2:    #B4C6D0;
+    --muted:    #7C919E;
+    --accent:   #2FBEB9;
+    --accent-2: #6FD9D4;
+    --accent-wash: #10312F;
+
+    --normal:   #58B268;
+    --warning:  #D79B22;
+    --high:     #E87B33;
+    --critical: #E45B4E;
+    --normal-wash:  #14291A;
+    --warning-wash: #2E2312;
+    --high-wash:    #33200F;
+    --critical-wash:#331715;
+
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 28px -14px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"] {
+  --ground:#090F14; --surface:#111A21; --raised:#16222A; --line:#24333D;
+  --line-soft:#1B2831; --ink:#E6EEF2; --ink-2:#B4C6D0; --muted:#7C919E;
+  --accent:#2FBEB9; --accent-2:#6FD9D4; --accent-wash:#10312F;
+  --normal:#58B268; --warning:#D79B22; --high:#E87B33; --critical:#E45B4E;
+  --normal-wash:#14291A; --warning-wash:#2E2312; --high-wash:#33200F; --critical-wash:#331715;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 28px -14px rgba(0,0,0,.7);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+:where(a) { color: var(--accent); }
+:where(button, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* ── Shell ─────────────────────────────────────────────────────────── */
+.shell { max-width: 1280px; margin: 0 auto; padding: 24px 20px 64px; }
+
+.masthead {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px;
+  padding-bottom: 16px; border-bottom: 1px solid var(--line);
+}
+.masthead h1 {
+  margin: 0; font-size: 19px; font-weight: 650; letter-spacing: -.01em;
+  text-wrap: balance;
+}
+.masthead .org { color: var(--muted); font-size: 13px; }
+.masthead .spacer { flex: 1 1 auto; }
+
+.stamp {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px;
+}
+
+.notice {
+  margin-top: 16px; padding: 11px 14px;
+  background: var(--accent-wash); border: 1px solid var(--accent);
+  border-radius: var(--radius); font-size: 13.5px; color: var(--ink-2);
+}
+.notice strong { color: var(--ink); }
+
+/* ── Rail ──────────────────────────────────────────────────────────── */
+.console { display: grid; grid-template-columns: 210px minmax(0,1fr); gap: 24px; margin-top: 22px; }
+@media (max-width: 860px) { .console { grid-template-columns: 1fr; } }
+
+.rail { display: flex; flex-direction: column; gap: 3px; align-self: start; }
+@media (max-width: 860px) { .rail { flex-direction: row; flex-wrap: wrap; } }
+
+.rail button {
+  appearance: none; cursor: pointer; text-align: left;
+  font: inherit; font-size: 14px;
+  background: transparent; color: var(--ink-2);
+  border: 1px solid transparent; border-radius: 8px;
+  padding: 9px 12px; display: flex; align-items: baseline; gap: 9px;
+  transition: background .12s ease, color .12s ease;
+}
+.rail button:hover { background: var(--raised); color: var(--ink); }
+.rail button[aria-current="true"] {
+  background: var(--surface); border-color: var(--line);
+  color: var(--ink); font-weight: 600; box-shadow: var(--shadow);
+}
+.rail .idx {
+  font-family: var(--mono); font-size: 10.5px; color: var(--muted);
+  letter-spacing: .04em;
+}
+
+/* ── Panels ────────────────────────────────────────────────────────── */
+.panel { display: none; }
+.panel[data-active="true"] { display: block; }
+
+.section-head {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  margin: 0 0 12px;
+}
+.section-head h2 {
+  margin: 0; font-size: 12px; font-weight: 650; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--muted);
+}
+.section-head .note { font-size: 13px; color: var(--muted); }
+.section + .section { margin-top: 30px; }
+
+.card {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.grid { display: grid; gap: 14px; }
+.grid.two { grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); }
+.grid.vessels { grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); }
+
+/* ── Figures ───────────────────────────────────────────────────────── */
+.fig { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.label {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--muted);
+}
+
+/* ── Pool cards ────────────────────────────────────────────────────── */
+.pool { padding: 16px 18px 14px; display: flex; flex-direction: column; gap: 12px; }
+.pool-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.pool h3 { margin: 0 0 2px; font-size: 15.5px; font-weight: 620; }
+.pool .sub { font-size: 12.5px; color: var(--muted); }
+
+.readout { display: flex; align-items: baseline; gap: 7px; }
+.readout .big { font-family: var(--mono); font-size: 30px; font-weight: 600; letter-spacing: -.02em; line-height: 1; }
+.readout .unit { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+
+/* Horizontal gauge: a warehouse floor filling left to right. */
+.bar { position: relative; height: 10px; background: var(--line-soft); border-radius: 3px; overflow: hidden; }
+.bar > i { position: absolute; inset: 0 auto 0 0; border-radius: 3px; display: block; }
+.bar > b {
+  position: absolute; top: -3px; bottom: -3px; width: 2px;
+  background: var(--ink); opacity: .38;
+}
+.figrow { display: flex; flex-wrap: wrap; gap: 16px 22px; }
+.figrow > div { min-width: 78px; }
+.figrow .v { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 560; }
+
+/* ── Vessel gauges: form follows the vessel ────────────────────────── */
+.vessel { padding: 14px 15px 13px; display: flex; gap: 14px; }
+.vessel .body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 9px; }
+.vessel h4 { margin: 0; font-size: 14px; font-weight: 620; }
+.vessel .code { font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: .03em; }
+
+/* A tank or silo is taller than it is wide, and fills from the bottom. */
+.tank {
+  position: relative; width: 34px; flex: 0 0 34px; height: 88px;
+  border: 1.5px solid var(--line); border-radius: 5px / 7px;
+  background: var(--line-soft); overflow: hidden;
+}
+.tank > i { position: absolute; inset: auto 0 0 0; display: block; }
+.tank > b {
+  position: absolute; left: -3px; right: -3px; height: 1.5px;
+  background: var(--ink); opacity: .42;
+}
+.tank-cap { font-family: var(--mono); font-size: 9.5px; color: var(--muted); text-align: center; margin-top: 4px; }
+
+.pct { font-family: var(--mono); font-size: 20px; font-weight: 600; line-height: 1; }
+
+/* ── Severity ──────────────────────────────────────────────────────── */
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--mono); font-size: 10px; letter-spacing: .07em;
+  text-transform: uppercase; padding: 3px 8px; border-radius: 999px;
+  border: 1px solid currentColor; white-space: nowrap;
+}
+.sev-NORMAL   { color: var(--normal); }
+.sev-WARNING  { color: var(--warning); }
+.sev-HIGH     { color: var(--high); }
+.sev-CRITICAL { color: var(--critical); }
+.sev-FULL     { color: var(--critical); }
+.fill-NORMAL   { background: var(--normal); }
+.fill-WARNING  { background: var(--warning); }
+.fill-HIGH     { background: var(--high); }
+.fill-CRITICAL { background: var(--critical); }
+.fill-FULL     { background: var(--critical); }
+.wash-NORMAL   { background: var(--normal-wash); }
+.wash-WARNING  { background: var(--warning-wash); }
+.wash-HIGH     { background: var(--high-wash); }
+.wash-CRITICAL { background: var(--critical-wash); }
+.wash-FULL     { background: var(--critical-wash); }
+
+/* ── Alerts ────────────────────────────────────────────────────────── */
+.alert { display: flex; gap: 12px; padding: 11px 15px; align-items: baseline; }
+.alert + .alert { border-top: 1px solid var(--line-soft); }
+.alert .stripe { flex: 0 0 3px; align-self: stretch; border-radius: 2px; }
+.alert .txt { flex: 1 1 auto; min-width: 0; }
+.alert .who { font-size: 13px; font-weight: 600; }
+.alert .msg { font-size: 13px; color: var(--ink-2); }
+
+/* ── Tables ────────────────────────────────────────────────────────── */
+.scroller { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { padding: 8px 12px; text-align: left; white-space: nowrap; }
+thead th {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--muted); font-weight: 500;
+  border-bottom: 1px solid var(--line);
+}
+tbody tr + tr td { border-top: 1px solid var(--line-soft); }
+tbody tr:hover td { background: var(--raised); }
+td.n, th.n { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+td.strong { font-weight: 600; }
+caption { caption-side: top; text-align: left; padding: 13px 15px 9px; font-size: 13px; color: var(--muted); }
+
+/* ── Projection chart ──────────────────────────────────────────────── */
+.chartwrap { padding: 15px 16px 8px; }
+.chart { width: 100%; height: 210px; display: block; }
+.chart .grid-line { stroke: var(--line-soft); stroke-width: 1; }
+.chart .ceiling { stroke: var(--critical); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.chart .safe    { stroke: var(--warning); stroke-width: 1.2; stroke-dasharray: 2 4; }
+.chart .curve   { fill: none; stroke: var(--accent); stroke-width: 2; }
+.chart .area    { fill: var(--accent); opacity: .13; }
+.chart .breach  { fill: var(--critical); }
+.chart text     { font-family: var(--mono); font-size: 9.5px; fill: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 0 16px 14px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); }
+.legend i { width: 15px; height: 0; border-top-width: 2px; border-top-style: solid; display: inline-block; }
+
+.pill-row { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 15px; }
+.pill {
+  border: 1px solid var(--line); border-radius: 8px; padding: 7px 11px;
+  display: flex; flex-direction: column; gap: 2px; min-width: 104px;
+}
+.pill .v { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 600; }
+
+.scope-tabs { display: flex; gap: 6px; padding: 13px 16px 0; }
+.scope-tabs button {
+  appearance: none; cursor: pointer; font: inherit; font-size: 13px;
+  background: transparent; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 7px; padding: 5px 11px;
+}
+.scope-tabs button[aria-pressed="true"] {
+  background: var(--accent-wash); border-color: var(--accent); color: var(--accent-2); font-weight: 600;
+}
+
+.foot {
+  margin-top: 34px; padding-top: 16px; border-top: 1px solid var(--line);
+  font-size: 12.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 20px;
+}
+.foot code {
+  font-family: var(--mono); font-size: 11.5px;
+  background: var(--raised); border: 1px solid var(--line-soft);
+  border-radius: 4px; padding: 1px 5px; color: var(--ink-2);
+}
+</style>
+
+<div class="shell">
+
+  <header class="masthead">
+    <div>
+      <h1>Storage Capacity Console</h1>
+      <div class="org">Kampong Speu Sugar Co., Ltd. &middot; Factory 1 &middot; Crushing season 2026/27</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="stamp" id="asOf">Position 15 Feb 2027</div>
+  </header>
+
+  <p class="notice">
+    <strong>A demonstration, not a live system.</strong>
+    Every figure below was captured from the running application — the same API that
+    serves the SAP&nbsp;UI5 dashboard — against a database seeded with the corrected
+    2026/27 production plan. The screens are reproduced here so they can be opened
+    and shared without deploying anything. Nothing here writes back.
+  </p>
+
+  <div class="console">
+    <nav class="rail" id="rail" aria-label="Screens"></nav>
+
+    <div>
+      <!-- ─────────────────────────── Dashboard ─────────────────────── -->
+      <section class="panel" id="p-dashboard" data-active="true" aria-labelledby="h-dashboard">
+        <div class="section">
+          <div class="section-head">
+            <h2 id="h-dashboard">Pooled storage</h2>
+            <span class="note">The 2026/27 plan tracks raw and finished sugar as pools, not per warehouse.</span>
+          </div>
+          <div class="grid two" id="pools"></div>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <h2>Capacity alerts</h2>
+            <span class="note" id="alertCount"></span>
+          </div>
+          <div class="card" id="alerts"></div>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <h2>Vessels</h2>
+            <span class="note">Tanks and the conditioning silo fill from the bottom; warehouses fill across.</span>
+          </div>
+          <div class="grid vessels" id="vessels"></div>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <h2>Warehouse &middot; product &middot; packaging</h2>
+            <span class="note">A product ceiling is a limit for that product, not extra building capacity.</span>
+          </div>
+          <div class="card scroller"><table id="productTable"></table></div>
+        </div>
+      </section>
+
+      <!-- ────────────────────────── Projection ─────────────────────── -->
+      <section class="panel" id="p-projection" aria-labelledby="h-projection">
+        <div class="section">
+          <div class="section-head">
+            <h2 id="h-projection">Projected capacity</h2>
+            <span class="note">The approved daily plan rolled forward to the end of the season.</span>
+          </div>
+          <div class="card">
+            <div class="scope-tabs" id="scopeTabs"></div>
+            <div class="chartwrap"><svg class="chart" id="chart" role="img" aria-labelledby="chartTitle"><title id="chartTitle">Projected closing stock against capacity</title></svg></div>
+            <div class="legend">
+              <span><i style="border-top-color: var(--accent);"></i> Projected closing stock</span>
+              <span><i style="border-top-color: var(--critical); border-top-style: dashed;"></i> Physical capacity</span>
+              <span><i style="border-top-color: var(--warning); border-top-style: dotted;"></i> Safe capacity</span>
+            </div>
+            <div class="pill-row" id="horizons"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ───────────────────────── Plan vs actual ──────────────────── -->
+      <section class="panel" id="p-planvsactual" aria-labelledby="h-pva">
+        <div class="section">
+          <div class="section-head">
+            <h2 id="h-pva">Plan versus actual &middot; 15 Feb 2027</h2>
+            <span class="note">Actual figures are derived from posted movements and are never keyed in.</span>
+          </div>
+          <div class="card scroller"><table id="pvaTable"></table></div>
+        </div>
+      </section>
+
+      <!-- ─────────────────────────── Remelt ────────────────────────── -->
+      <section class="panel" id="p-remelt" aria-labelledby="h-remelt">
+        <div class="section">
+          <div class="section-head">
+            <h2 id="h-remelt">Raw sugar available to remelt</h2>
+            <span class="note">Available is what is on hand less anything already reserved.</span>
+          </div>
+          <div class="card scroller"><table id="remeltTable"></table></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><h2>All stock on hand</h2></div>
+          <div class="card scroller"><table id="stockTable"></table></div>
+        </div>
+      </section>
+
+      <!-- ────────────────────────── Master data ────────────────────── -->
+      <section class="panel" id="p-masterdata" aria-labelledby="h-master">
+        <div class="section">
+          <div class="section-head">
+            <h2 id="h-master">Storage locations</h2>
+            <span class="note">All of this is configuration, editable in the application.</span>
+          </div>
+          <div class="card scroller"><table id="locTable"></table></div>
+        </div>
+        <div class="section">
+          <div class="section-head">
+            <h2>Packaging</h2>
+            <span class="note">The per-package weight is the single source for every bag/ton conversion.</span>
+          </div>
+          <div class="card scroller"><table id="pkgTable"></table></div>
+        </div>
+        <div class="section">
+          <div class="section-head">
+            <h2>Alert thresholds</h2>
+            <span class="note">Bands must cover 0% upwards with no gap, and the top band has no ceiling.</span>
+          </div>
+          <div class="card scroller"><table id="bandTable"></table></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <footer class="foot">
+    <span>Go &middot; PostgreSQL 16 &middot; SAP UI5</span>
+    <span>Data captured from <code>/api/v1</code> against the seeded 2026/27 plan</span>
+    <span>Source: <code>Sovanna2011/SugarProductionPlanning</code> PR&nbsp;#1</span>
+  </footer>
+</div>
+
+<script>window.__SPP__ = {"dashboard":{"factoryCode":"KSS-F1","factoryName":"Kampong Speu Sugar Factory 1","asOfDate":"2026-08-08","groups":[{"groupCode":"FG-POOL","groupName":"Finished Sugar Warehouses (W1 + W3)","memberCodes":["FG-WH01","FG-WH03"],"utilization":{"capacity":69000,"safeCapacity":65550,"currentStock":28499.6,"reservedStock":0,"availableStock":28499.6,"availableCapacity":37050.4,"availablePhysicalCapacity":40500.4,"utilizationPercentage":41.3,"band":{"code":"NORMAL","name":"Normal","severity":"NORMAL","uiState":"Success","fromPercentage":0,"toPercentage":80},"uom":"TON"},"remark":"Planned as one 69,000 t pool in the 2026/27 workbook","hasPlan":true},{"groupCode":"RAW-POOL","groupName":"Raw Sugar Warehouses (W1 + W2)","memberCodes":["RAW-WH01","RAW-WH02"],"utilization":{"capacity":110000,"safeCapacity":104500,"currentStock":74870.3,"reservedStock":0,"availableStock":74870.3,"availableCapacity":29629.7,"availablePhysicalCapacity":35129.7,"utilizationPercentage":68.06,"band":{"code":"NORMAL","name":"Normal","severity":"NORMAL","uiState":"Success","fromPercentage":0,"toPercentage":80},"uom":"TON"},"remark":"Planned as one 110,000 t pool in the 2026/27 workbook","hasPlan":true}],"storages":[{"storageCode":"CON-S01","storageName":"Conditioning Silo 1","storageTypeCode":"CONDITIONING_SILO","storageTypeName":"Conditioning Silo","tracksPackages":false,"status":"ACTIVE","remark":"EXAMPLE capacity 2,000 t (requirement section 17); plan holds a steady 1,600 t working stock","hasPlan":true,"utilization":{"capacity":2000,"safeCapacity":1900,"currentStock":1600,"reservedStock":0,"availableStock":1600,"availableCapacity":300,"availablePhysicalCapacity":400,"utilizationPercentage":80,"band":{"code":"WARNING","name":"Warning","severity":"WARNING","uiState":"Warning","fromPercentage":80,"toPercentage":90},"uom":"TON"},"products":[{"productCode":"REFINED-SUGAR","productName":"Refined Sugar","packagingCode":"PKG-BULK","packagingDescription":"Bulk / Unpacked","weightPerPackage":0,"currentPackages":0,"currentWeight":1600,"reservedWeight":0,"availableWeight":1600,"maximumWeight":2000,"availableWeightCapacity":400,"utilizationPercentage":80,"band":{"code":"WARNING","name":"Warning","severity":"WARNING","uiState":"Warning","fromPercentage":80,"toPercentage":90},"remark":"Weight-managed; no bag count"}]},{"storageCode":"FG-WH01","storageName":"Finished Sugar Warehouse 1","storageTypeCode":"FINISHED_GOODS_WAREHOUSE","storageTypeName":"Finished Goods Warehouse","tracksPackages":true,"status":"ACTIVE","remark":"PLAN capacity 22,000 t (summary report section 5, \"Refined Sugar Warehouse 1\")","hasPlan":false,"utilization":{"capacity":22000,"safeCapacity":20900,"currentStock":9086.85,"reservedStock":0,"availableStock":9086.85,"availableCapacity":11813.15,"availablePhysicalCapacity":12913.15,"utilizationPercentage":41.3,"band":{"code":"NORMAL","name":"Normal","severity":"NORMAL","uiState":"Success","fromPercentage":0,"toPercentage":80},"uom":"TON"},"products":[{"productCode":"REFINED-SUGAR","productName":"Refined Sugar","packagingCode":"PKG-50KG","packagingDescription":"50 KG Bag","weightPerPackage":0.05,"currentPackages":72696,"currentWeight":3634.8,"reservedWeight":0,"availableWeight":3634.8,"maximumPackages":200000,"maximumWeight":10000,"availablePackageSpaces":127304,"availableWeightCapacity":6365.2,"utilizationPercentage":36.35,"band":{"code":"NORMAL","name":"Normal","severity":"NORMAL","uiState":"Success","fromPercentage":0,"toPercentage":80},"remark":"EXAMPLE from requirement section 12"},{"productCode":"REFINED-SUGAR","productName":"Refined Sugar","packagingCode":"PKG-JUMBO","packagingDescription":"Jumbo Bag 1.1 T","weightPerPackage":1.1,"currentPackages":1239,"currentWeight":1362.9,"reservedWeight":0,"availableWeight":1362.9,"maximumPackages":5000,"maximumWeight":5500,"availablePackageSpaces":3761,"availableWeightCapacity":4137.1,"utilizationPercentage":24.78,"band":{"code":"NORMAL","name":"Normal","severity":"NORMAL","uiState":"Success","fromPercentage":0,"toPercentage":80},"remark":"EXAMPLE from requirement section 12"},{"productCode":"WHITE-SUGAR","productName":"White Sugar","packagingCode":"PKG-50KG","packagingDescription":"50 KG Bag","weightPerPackage":0.05,"currentPackages":81783,"currentWeight":4089.15,"reservedWeight":0,"availableWeight":4089.15,"maximumPackages":100000,"maximumWeight":5000,"availablePackageSpaces":18217,"availableWeightCapacity":910.85,"utilizationPercentage":81.78,"band":{"code":"WARNING","name":"Warning","severity":"WARNING","uiState":"Warning","fromPercentage":80,"toPercentage":90},"remark":"EXAMPLE from requirement section 12"}]},{"storageCode":"FG-WH03","storageName":"Finished Sugar Warehouse 3","storageTypeCode":"FINISHED_GOODS_WAREHOUSE","storageTypeName":"Finished Goods Warehouse","tracksPackages":true,"status":"ACTIVE","remark":"PLAN capacity 47,000 t (summary report section 5, \"Refined Sugar Warehouse 3\")","hasPlan":false,"utilization":{"capacity":47000,"safeCapacity":44650,"currentStock":19412.75,"reservedStock":0,"availableStock":19412.75,"availableCapacity":25237.25,"availablePhysicalCapacity":27587.25,"utilizationPercentage":41.3,"band":{"code":"NORMAL","name":"Normal","severity":"NORMAL","uiState":"Success","fromPercentage":0,"toPercentage":80},"uom":"TON"},"products":[{"productCode":"REFINED-SUGAR","productName":"Refined Sugar","packagingCode":"PKG-50KG","packagingDescription":"50 KG Bag","weightPerPackage":0.05,"currentPackages":155304,"currentWeight":7765.2,"reservedWeight":0,"availableWeight":7765.2,"maximumPackages":400000,"maximumWeight":20000,"availablePackageSpaces":244696,"availableWeightCapacity":12234.8,"utilizationPercentage":38.83,"band":{"code":"NORMAL","name":"Normal","severity":"NORMAL","uiState":"Success","fromPercentage":0,"toPercentage":80},"remark":"Derived from physical capacity - confirm product split"},{"productCode":"REFINED-SUGAR","productName":"Refined Sugar","packagingCode":"PKG-JUMBO","packagingDescription":"Jumbo Bag 1.1 T","weightPerPackage":1.1,"currentPackages":2647,"currentWeight":2911.7,"reservedWeight":0,"availableWeight":2911.7,"maximumPackages":6000,"maximumWeight":6600,"availablePackageSpaces":3353,"availableWeightCapacity":3688.3,"utilizationPercentage":44.12,"band":{"code":"NORMAL","name":"Normal","severity":"NORMAL","uiState":"Success","fromPercentage":0,"toPercentage":80},"remark":"EXAMPLE from requirement section 12"},{"productCode":"SUPER-REFINED","productName":"Super Refined Sugar","packagingCode":"PKG-50KG","packagingDescription":"50 KG Bag","weightPerPackage":0.05,"currentPackages":0,"currentWeight":0,"reservedWeight":0,"availableWeight":0,"maximumPackages":40000,"maximumWeight":2000,"availablePackageSpaces":40000,"availableWeightCapacity":2000,"utilizationPercentage":0,"band":{"code":"NORMAL","name":"Normal","severity":"NORMAL","uiState":"Success","fromPercentage":0,"toPercentage":80},"remark":"Sized for the 2,000 t remelt-period super refined programme"},{"productCode":"WHITE-SUGAR","productName":"White Sugar","packagingCode":"PKG-50KG","packagingDescription":"50 KG Bag","weightPerPackage":0.05,"currentPackages":174717,"currentWeight":8735.85,"reservedWeight":0,"availableWeight":8735.85,"maximumPackages":540000,"maximumWeight":27000,"availablePackageSpaces":365283,"availableWeightCapacity":18264.15,"utilizationPercentage":32.36,"band":{"code":"NORMAL","name":"Normal","severity":"NORMAL","uiState":"Success","fromPercentage":0,"toPercentage":80},"remark":"Derived from physical capacity - confirm product split"},{"productCode":"WHITE-SUGAR","productName":"White Sugar","packagingCode":"PKG-JUMBO","packagingDescription":"Jumbo Bag 1.1 T","weightPerPackage":1.1,"currentPackages":0,"currentWeight":0,"reservedWeight":0,"availableWeight":0,"maximumPackages":6000,"maximumWeight":6600,"availablePackageSpaces":6000,"availableWeightCapacity":6600,"utilizationPercentage":0,"band":{"code":"NORMAL","name":"Normal","severity":"NORMAL","uiState":"Success","fromPercentage":0,"toPercentage":80},"remark":"EXAMPLE from requirement section 12"}]},{"storageCode":"RAW-WH01","storageName":"Raw Sugar Warehouse 1","storageTypeCode":"RAW_SUGAR_WAREHOUSE","storageTypeName":"Raw Sugar Warehouse","tracksPackages":true,"status":"ACTIVE","remark":"PLAN capacity 45,000 t (summary report section 3)","hasPlan":false,"utilization":{"capacity":45000,"safeCapacity":42750,"currentStock":30628.809,"reservedStock":0,"availableStock":30628.809,"availableCapacity":12121.191,"availablePhysicalCapacity":14371.191,"utilizationPercentage":68.06,"band":{"code":"NORMAL","name":"Normal","severity":"NORMAL","uiState":"Success","fromPercentage":0,"toPercentage":80},"uom":"TON"},"products":[{"productCode":"RAW-SUGAR","productName":"Raw Sugar","packagingCode":"PKG-BULK","packagingDescription":"Bulk / Unpacked","weightPerPackage":0,"currentPackages":0,"currentWeight":24502.909,"reservedWeight":0,"availableWeight":24502.909,"maximumWeight":30000,"availableWeightCapacity":5497.091,"utilizationPercentage":81.68,"band":{"code":"WARNING","name":"Warning","severity":"WARNING","uiState":"Warning","fromPercentage":80,"toPercentage":90},"remark":"EXAMPLE split from requirement section 8"},{"productCode":"RAW-SUGAR","productName":"Raw Sugar","packagingCode":"PKG-JUMBO","packagingDescription":"Jumbo Bag 1.1 T","weightPerPackage":1.1,"currentPackages":5569,"currentWeight":6125.9,"reservedWeight":0,"availableWeight":6125.9,"maximumPackages":10000,"maximumWeight":11000,"availablePackageSpaces":4431,"availableWeightCapacity":4874.1,"utilizationPercentage":55.69,"band":{"code":"NORMAL","name":"Normal","severity":"NORMAL","uiState":"Success","fromPercentage":0,"toPercentage":80},"remark":"EXAMPLE split from requirement section 8: 10,000 bags x 1.1 t"}]},{"storageCode":"RAW-WH02","storageName":"Raw Sugar Warehouse 2","storageTypeCode":"RAW_SUGAR_WAREHOUSE","storageTypeName":"Raw Sugar Warehouse","tracksPackages":true,"status":"ACTIVE","remark":"PLAN capacity 65,000 t (summary report section 3); holds the jumbo bag overflow","hasPlan":false,"utilization":{"capacity":65000,"safeCapacity":61750,"currentStock":44241.491,"reservedStock":0,"availableStock":44241.491,"availableCapacity":17508.509,"availablePhysicalCapacity":20758.509,"utilizationPercentage":68.06,"band":{"code":"NORMAL","name":"Normal","severity":"NORMAL","uiState":"Success","fromPercentage":0,"toPercentage":80},"uom":"TON"},"products":[{"productCode":"RAW-SUGAR","productName":"Raw Sugar","packagingCode":"PKG-BULK","packagingDescription":"Bulk / Unpacked","weightPerPackage":0,"currentPackages":0,"currentWeight":35393.091,"reservedWeight":0,"availableWeight":35393.091,"maximumWeight":45000,"availableWeightCapacity":9606.909,"utilizationPercentage":78.65,"band":{"code":"NORMAL","name":"Normal","severity":"NORMAL","uiState":"Success","fromPercentage":0,"toPercentage":80},"remark":"Derived from physical capacity - confirm bulk/jumbo split"},{"productCode":"RAW-SUGAR","productName":"Raw Sugar","packagingCode":"PKG-JUMBO","packagingDescription":"Jumbo Bag 1.1 T","weightPerPackage":1.1,"currentPackages":8044,"currentWeight":8848.4,"reservedWeight":0,"availableWeight":8848.4,"maximumPackages":18182,"maximumWeight":20000,"availablePackageSpaces":10138,"availableWeightCapacity":11151.6,"utilizationPercentage":44.24,"band":{"code":"NORMAL","name":"Normal","severity":"NORMAL","uiState":"Success","fromPercentage":0,"toPercentage":80},"remark":"Sized for the 20,700 t jumbo bag programme (21-Jan to 30-Mar-2027)"}]},{"storageCode":"MOL-T01","storageName":"Molasses Tank 1","storageTypeCode":"TANK","storageTypeName":"Tank","tracksPackages":false,"status":"ACTIVE","remark":"EXAMPLE capacity (requirement section 7) - confirm actual tank volume","hasPlan":false,"utilization":{"capacity":5000,"safeCapacity":4750,"currentStock":4100,"reservedStock":0,"availableStock":4100,"availableCapacity":650,"availablePhysicalCapacity":900,"utilizationPercentage":82,"band":{"code":"WARNING","name":"Warning","severity":"WARNING","uiState":"Warning","fromPercentage":80,"toPercentage":90},"uom":"TON"},"products":[{"productCode":"MOLASSES","productName":"Molasses","packagingCode":"PKG-BULK","packagingDescription":"Bulk / Unpacked","weightPerPackage":0,"currentPackages":0,"currentWeight":4100,"reservedWeight":0,"availableWeight":4100,"maximumWeight":5000,"availableWeightCapacity":900,"utilizationPercentage":82,"band":{"code":"WARNING","name":"Warning","severity":"WARNING","uiState":"Warning","fromPercentage":80,"toPercentage":90},"remark":"Whole tank available to molasses"}]},{"storageCode":"MOL-T02","storageName":"Molasses Tank 2","storageTypeCode":"TANK","storageTypeName":"Tank","tracksPackages":false,"status":"ACTIVE","remark":"EXAMPLE capacity (requirement section 7) - confirm actual tank volume","hasPlan":false,"utilization":{"capacity":5000,"safeCapacity":4750,"currentStock":4550,"reservedStock":0,"availableStock":4550,"availableCapacity":200,"availablePhysicalCapacity":450,"utilizationPercentage":91,"band":{"code":"HIGH","name":"High","severity":"HIGH","uiState":"Warning","fromPercentage":90,"toPercentage":95},"uom":"TON"},"products":[{"productCode":"MOLASSES","productName":"Molasses","packagingCode":"PKG-BULK","packagingDescription":"Bulk / Unpacked","weightPerPackage":0,"currentPackages":0,"currentWeight":4550,"reservedWeight":0,"availableWeight":4550,"maximumWeight":5000,"availableWeightCapacity":450,"utilizationPercentage":91,"band":{"code":"HIGH","name":"High","severity":"HIGH","uiState":"Warning","fromPercentage":90,"toPercentage":95},"remark":"Whole tank available to molasses"}]},{"storageCode":"MOL-T03","storageName":"Molasses Tank 3","storageTypeCode":"TANK","storageTypeName":"Tank","tracksPackages":false,"status":"ACTIVE","remark":"EXAMPLE capacity (requirement section 7) - confirm actual tank volume","hasPlan":false,"utilization":{"capacity":5000,"safeCapacity":4750,"currentStock":2900,"reservedStock":0,"availableStock":2900,"availableCapacity":1850,"availablePhysicalCapacity":2100,"utilizationPercentage":58,"band":{"code":"NORMAL","name":"Normal","severity":"NORMAL","uiState":"Success","fromPercentage":0,"toPercentage":80},"uom":"TON"},"products":[{"productCode":"MOLASSES","productName":"Molasses","packagingCode":"PKG-BULK","packagingDescription":"Bulk / Unpacked","weightPerPackage":0,"currentPackages":0,"currentWeight":2900,"reservedWeight":0,"availableWeight":2900,"maximumWeight":5000,"availableWeightCapacity":2100,"utilizationPercentage":58,"band":{"code":"NORMAL","name":"Normal","severity":"NORMAL","uiState":"Success","fromPercentage":0,"toPercentage":80},"remark":"Whole tank available to molasses"}]}],"alerts":[{"scopeCode":"MOL-T02","scopeName":"Molasses Tank 2","scopeType":"LOCATION","severity":"HIGH","uiState":"Warning","message":"Molasses Tank 2 is 91% full (4,550 of 5,000 TON)","utilizationPercentage":91},{"scopeCode":"MOL-T02","scopeName":"Molasses Tank 2 / Molasses PKG-BULK","scopeType":"PRODUCT","severity":"HIGH","uiState":"Warning","message":"Molasses Tank 2 has only 450 TON of space left for Molasses PKG-BULK","utilizationPercentage":91},{"scopeCode":"MOL-T01","scopeName":"Molasses Tank 1","scopeType":"LOCATION","severity":"WARNING","uiState":"Warning","message":"Molasses Tank 1 is 82% full (4,100 of 5,000 TON)","utilizationPercentage":82},{"scopeCode":"MOL-T01","scopeName":"Molasses Tank 1 / Molasses PKG-BULK","scopeType":"PRODUCT","severity":"WARNING","uiState":"Warning","message":"Molasses Tank 1 has only 900 TON of space left for Molasses PKG-BULK","utilizationPercentage":82},{"scopeCode":"FG-WH01","scopeName":"Finished Sugar Warehouse 1 / White Sugar PKG-50KG","scopeType":"PRODUCT","severity":"WARNING","uiState":"Warning","message":"Finished Sugar Warehouse 1 has only 18,217 spaces available for White Sugar PKG-50KG","utilizationPercentage":81.78},{"scopeCode":"RAW-WH01","scopeName":"Raw Sugar Warehouse 1 / Raw Sugar PKG-BULK","scopeType":"PRODUCT","severity":"WARNING","uiState":"Warning","message":"Raw Sugar Warehouse 1 has only 5,497.091 TON of space left for Raw Sugar PKG-BULK","utilizationPercentage":81.68},{"scopeCode":"CON-S01","scopeName":"Conditioning Silo 1","scopeType":"LOCATION","severity":"WARNING","uiState":"Warning","message":"Conditioning Silo 1 is 80% full (1,600 of 2,000 TON)","utilizationPercentage":80},{"scopeCode":"CON-S01","scopeName":"Conditioning Silo 1 / Refined Sugar PKG-BULK","scopeType":"PRODUCT","severity":"WARNING","uiState":"Warning","message":"Conditioning Silo 1 has only 400 TON of space left for Refined Sugar PKG-BULK","utilizationPercentage":80}]},"alerts":[{"scopeCode":"MOL-T02","scopeName":"Molasses Tank 2","scopeType":"LOCATION","severity":"HIGH","uiState":"Warning","message":"Molasses Tank 2 is 91% full (4,550 of 5,000 TON)","utilizationPercentage":91},{"scopeCode":"MOL-T02","scopeName":"Molasses Tank 2 / Molasses PKG-BULK","scopeType":"PRODUCT","severity":"HIGH","uiState":"Warning","message":"Molasses Tank 2 has only 450 TON of space left for Molasses PKG-BULK","utilizationPercentage":91},{"scopeCode":"MOL-T01","scopeName":"Molasses Tank 1","scopeType":"LOCATION","severity":"WARNING","uiState":"Warning","message":"Molasses Tank 1 is 82% full (4,100 of 5,000 TON)","utilizationPercentage":82},{"scopeCode":"MOL-T01","scopeName":"Molasses Tank 1 / Molasses PKG-BULK","scopeType":"PRODUCT","severity":"WARNING","uiState":"Warning","message":"Molasses Tank 1 has only 900 TON of space left for Molasses PKG-BULK","utilizationPercentage":82},{"scopeCode":"FG-WH01","scopeName":"Finished Sugar Warehouse 1 / White Sugar PKG-50KG","scopeType":"PRODUCT","severity":"WARNING","uiState":"Warning","message":"Finished Sugar Warehouse 1 has only 18,217 spaces available for White Sugar PKG-50KG","utilizationPercentage":81.78},{"scopeCode":"RAW-WH01","scopeName":"Raw Sugar Warehouse 1 / Raw Sugar PKG-BULK","scopeType":"PRODUCT","severity":"WARNING","uiState":"Warning","message":"Raw Sugar Warehouse 1 has only 5,497.091 TON of space left for Raw Sugar PKG-BULK","utilizationPercentage":81.68},{"scopeCode":"CON-S01","scopeName":"Conditioning Silo 1","scopeType":"LOCATION","severity":"WARNING","uiState":"Warning","message":"Conditioning Silo 1 is 80% full (1,600 of 2,000 TON)","utilizationPercentage":80},{"scopeCode":"CON-S01","scopeName":"Conditioning Silo 1 / Refined Sugar PKG-BULK","scopeType":"PRODUCT","severity":"WARNING","uiState":"Warning","message":"Conditioning Silo 1 has only 400 TON of space left for Refined Sugar PKG-BULK","utilizationPercentage":80}],"planVsActual":[{"scopeCode":"CON-S01","scopeName":"Conditioning Silo 1","productCode":"REFINED-SUGAR","packagingCode":"PKG-BULK","opening":1600,"plannedIn":400,"actualIn":1600,"plannedOut":400,"actualOut":0,"plannedClosing":1600,"actualClosing":1600,"variance":0,"capacity":2000,"availableCapacity":300,"utilizationPercentage":80,"band":{"code":"WARNING","name":"Warning","severity":"WARNING","uiState":"Warning","fromPercentage":80,"toPercentage":90},"uom":"TON"},{"scopeCode":"FG-POOL","scopeName":"Finished Sugar Warehouses (W1 + W3)","opening":28100,"plannedIn":900,"actualIn":28499.6,"plannedOut":500,"actualOut":0,"plannedClosing":28500,"actualClosing":28499.6,"variance":-0.4,"capacity":69000,"availableCapacity":37050.4,"utilizationPercentage":41.3,"band":{"code":"NORMAL","name":"Normal","severity":"NORMAL","uiState":"Success","fromPercentage":0,"toPercentage":80},"uom":"TON"},{"scopeCode":"RAW-POOL","scopeName":"Raw Sugar Warehouses (W1 + W2)","productCode":"RAW-SUGAR","opening":74025,"plannedIn":1145,"actualIn":74870.3,"plannedOut":300,"actualOut":0,"plannedClosing":74870,"actualClosing":74870.3,"variance":0.3,"capacity":110000,"availableCapacity":29629.7,"utilizationPercentage":68.06,"band":{"code":"NORMAL","name":"Normal","severity":"NORMAL","uiState":"Success","fromPercentage":0,"toPercentage":80},"uom":"TON"}],"balances":[{"id":11,"factoryId":1,"storageLocationId":6,"storageCode":"CON-S01","storageName":"Conditioning Silo 1","productId":3,"productCode":"REFINED-SUGAR","productName":"Refined Sugar","packagingTypeId":1,"packagingCode":"PKG-BULK","batchNo":"","packageQuantity":0,"weightQuantity":1600,"reservedPackageQuantity":0,"reservedWeightQuantity":0,"weightUom":"TON","lastMovementDate":"2027-02-15T00:00:00Z"},{"id":5,"factoryId":1,"storageLocationId":9,"storageCode":"FG-WH01","storageName":"Finished Sugar Warehouse 1","productId":3,"productCode":"REFINED-SUGAR","productName":"Refined Sugar","packagingTypeId":3,"packagingCode":"PKG-50KG","batchNo":"R26001","packageQuantity":72696,"weightQuantity":3634.8,"reservedPackageQuantity":0,"reservedWeightQuantity":0,"weightUom":"TON","lastMovementDate":"2027-02-15T00:00:00Z"},{"id":9,"factoryId":1,"storageLocationId":9,"storageCode":"FG-WH01","storageName":"Finished Sugar Warehouse 1","productId":3,"productCode":"REFINED-SUGAR","productName":"Refined Sugar","packagingTypeId":6,"packagingCode":"PKG-JUMBO","batchNo":"RJ26002","packageQuantity":1239,"weightQuantity":1362.9,"reservedPackageQuantity":0,"reservedWeightQuantity":0,"weightUom":"TON","lastMovementDate":"2027-02-15T00:00:00Z"},{"id":7,"factoryId":1,"storageLocationId":9,"storageCode":"FG-WH01","storageName":"Finished Sugar Warehouse 1","productId":4,"productCode":"WHITE-SUGAR","productName":"White Sugar","packagingTypeId":3,"packagingCode":"PKG-50KG","batchNo":"W26001","packageQuantity":81783,"weightQuantity":4089.15,"reservedPackageQuantity":0,"reservedWeightQuantity":0,"weightUom":"TON","lastMovementDate":"2027-02-15T00:00:00Z"},{"id":6,"factoryId":1,"storageLocationId":7,"storageCode":"FG-WH03","storageName":"Finished Sugar Warehouse 3","productId":3,"productCode":"REFINED-SUGAR","productName":"Refined Sugar","packagingTypeId":3,"packagingCode":"PKG-50KG","batchNo":"R26001","packageQuantity":155304,"weightQuantity":7765.2,"reservedPackageQuantity":0,"reservedWeightQuantity":0,"weightUom":"TON","lastMovementDate":"2027-02-15T00:00:00Z"},{"id":10,"factoryId":1,"storageLocationId":7,"storageCode":"FG-WH03","storageName":"Finished Sugar Warehouse 3","productId":3,"productCode":"REFINED-SUGAR","productName":"Refined Sugar","packagingTypeId":6,"packagingCode":"PKG-JUMBO","batchNo":"RJ26002","packageQuantity":2647,"weightQuantity":2911.7,"reservedPackageQuantity":0,"reservedWeightQuantity":0,"weightUom":"TON","lastMovementDate":"2027-02-15T00:00:00Z"},{"id":8,"factoryId":1,"storageLocationId":7,"storageCode":"FG-WH03","storageName":"Finished Sugar Warehouse 3","productId":4,"productCode":"WHITE-SUGAR","productName":"White Sugar","packagingTypeId":3,"packagingCode":"PKG-50KG","batchNo":"W26001","packageQuantity":174717,"weightQuantity":8735.85,"reservedPackageQuantity":0,"reservedWeightQuantity":0,"weightUom":"TON","lastMovementDate":"2027-02-15T00:00:00Z"},{"id":12,"factoryId":1,"storageLocationId":3,"storageCode":"MOL-T01","storageName":"Molasses Tank 1","productId":1,"productCode":"MOLASSES","productName":"Molasses","packagingTypeId":1,"packagingCode":"PKG-BULK","batchNo":"","packageQuantity":0,"weightQuantity":4100,"reservedPackageQuantity":0,"reservedWeightQuantity":0,"weightUom":"TON","lastMovementDate":"2027-02-15T00:00:00Z"},{"id":13,"factoryId":1,"storageLocationId":2,"storageCode":"MOL-T02","storageName":"Molasses Tank 2","productId":1,"productCode":"MOLASSES","productName":"Molasses","packagingTypeId":1,"packagingCode":"PKG-BULK","batchNo":"","packageQuantity":0,"weightQuantity":4550,"reservedPackageQuantity":0,"reservedWeightQuantity":0,"weightUom":"TON","lastMovementDate":"2027-02-15T00:00:00Z"},{"id":14,"factoryId":1,"storageLocationId":1,"storageCode":"MOL-T03","storageName":"Molasses Tank 3","productId":1,"productCode":"MOLASSES","productName":"Molasses","packagingTypeId":1,"packagingCode":"PKG-BULK","batchNo":"","packageQuantity":0,"weightQuantity":2900,"reservedPackageQuantity":0,"reservedWeightQuantity":0,"weightUom":"TON","lastMovementDate":"2027-02-15T00:00:00Z"},{"id":1,"factoryId":1,"storageLocationId":5,"storageCode":"RAW-WH01","storageName":"Raw Sugar Warehouse 1","productId":2,"productCode":"RAW-SUGAR","productName":"Raw Sugar","packagingTypeId":1,"packagingCode":"PKG-BULK","batchNo":"RS26001","packageQuantity":0,"weightQuantity":24502.909,"reservedPackageQuantity":0,"reservedWeightQuantity":0,"weightUom":"TON","lastMovementDate":"2027-02-15T00:00:00Z"},{"id":3,"factoryId":1,"storageLocationId":5,"storageCode":"RAW-WH01","storageName":"Raw Sugar Warehouse 1","productId":2,"productCode":"RAW-SUGAR","productName":"Raw Sugar","packagingTypeId":6,"packagingCode":"PKG-JUMBO","batchNo":"RJ26001","packageQuantity":5569,"weightQuantity":6125.9,"reservedPackageQuantity":0,"reservedWeightQuantity":0,"weightUom":"TON","lastMovementDate":"2027-02-15T00:00:00Z"},{"id":2,"factoryId":1,"storageLocationId":4,"storageCode":"RAW-WH02","storageName":"Raw Sugar Warehouse 2","productId":2,"productCode":"RAW-SUGAR","productName":"Raw Sugar","packagingTypeId":1,"packagingCode":"PKG-BULK","batchNo":"RS26001","packageQuantity":0,"weightQuantity":35393.091,"reservedPackageQuantity":0,"reservedWeightQuantity":0,"weightUom":"TON","lastMovementDate":"2027-02-15T00:00:00Z"},{"id":4,"factoryId":1,"storageLocationId":4,"storageCode":"RAW-WH02","storageName":"Raw Sugar Warehouse 2","productId":2,"productCode":"RAW-SUGAR","productName":"Raw Sugar","packagingTypeId":6,"packagingCode":"PKG-JUMBO","batchNo":"RJ26001","packageQuantity":8044,"weightQuantity":8848.4,"reservedPackageQuantity":0,"reservedWeightQuantity":0,"weightUom":"TON","lastMovementDate":"2027-02-15T00:00:00Z"}],"locations":[{"id":6,"factoryId":1,"storageCode":"CON-S01","storageName":"Conditioning Silo 1","storageTypeId":3,"storageTypeCode":"CONDITIONING_SILO","storageTypeName":"Conditioning Silo","tracksPackages":false,"physicalCapacity":2000,"capacityUom":"TON","minimumStockLevel":0,"safeCapacityPercentage":95,"allowMixedProducts":false,"allowMixedBatches":true,"status":"ACTIVE","effectiveFrom":"1900-01-01T00:00:00Z","remark":"EXAMPLE capacity 2,000 t (requirement section 17); plan holds a steady 1,600 t working stock","version":1},{"id":9,"factoryId":1,"storageCode":"FG-WH01","storageName":"Finished Sugar Warehouse 1","storageTypeId":4,"storageTypeCode":"FINISHED_GOODS_WAREHOUSE","storageTypeName":"Finished Goods Warehouse","tracksPackages":true,"physicalCapacity":22000,"capacityUom":"TON","minimumStockLevel":0,"safeCapacityPercentage":95,"allowMixedProducts":true,"allowMixedBatches":true,"status":"ACTIVE","effectiveFrom":"1900-01-01T00:00:00Z","remark":"PLAN capacity 22,000 t (summary report section 5, \"Refined Sugar Warehouse 1\")","version":1},{"id":8,"factoryId":1,"storageCode":"FG-WH02","storageName":"Finished Sugar Warehouse 2","storageTypeId":4,"storageTypeCode":"FINISHED_GOODS_WAREHOUSE","storageTypeName":"Finished Goods Warehouse","tracksPackages":true,"physicalCapacity":0,"capacityUom":"TON","minimumStockLevel":0,"safeCapacityPercentage":95,"allowMixedProducts":true,"allowMixedBatches":true,"status":"INACTIVE","effectiveFrom":"1900-01-01T00:00:00Z","remark":"Present in the storage structure but not part of the 2026/27 plan, whose 69,000 t is W1 + W3 only. Set a capacity and activate when it comes into use.","version":1},{"id":7,"factoryId":1,"storageCode":"FG-WH03","storageName":"Finished Sugar Warehouse 3","storageTypeId":4,"storageTypeCode":"FINISHED_GOODS_WAREHOUSE","storageTypeName":"Finished Goods Warehouse","tracksPackages":true,"physicalCapacity":47000,"capacityUom":"TON","minimumStockLevel":0,"safeCapacityPercentage":95,"allowMixedProducts":true,"allowMixedBatches":true,"status":"ACTIVE","effectiveFrom":"1900-01-01T00:00:00Z","remark":"PLAN capacity 47,000 t (summary report section 5, \"Refined Sugar Warehouse 3\")","version":1},{"id":5,"factoryId":1,"storageCode":"RAW-WH01","storageName":"Raw Sugar Warehouse 1","storageTypeId":2,"storageTypeCode":"RAW_SUGAR_WAREHOUSE","storageTypeName":"Raw Sugar Warehouse","tracksPackages":true,"physicalCapacity":45000,"capacityUom":"TON","minimumStockLevel":0,"safeCapacityPercentage":95,"allowMixedProducts":true,"allowMixedBatches":true,"status":"ACTIVE","effectiveFrom":"1900-01-01T00:00:00Z","remark":"PLAN capacity 45,000 t (summary report section 3)","version":1},{"id":4,"factoryId":1,"storageCode":"RAW-WH02","storageName":"Raw Sugar Warehouse 2","storageTypeId":2,"storageTypeCode":"RAW_SUGAR_WAREHOUSE","storageTypeName":"Raw Sugar Warehouse","tracksPackages":true,"physicalCapacity":65000,"capacityUom":"TON","minimumStockLevel":0,"safeCapacityPercentage":95,"allowMixedProducts":true,"allowMixedBatches":true,"status":"ACTIVE","effectiveFrom":"1900-01-01T00:00:00Z","remark":"PLAN capacity 65,000 t (summary report section 3); holds the jumbo bag overflow","version":1},{"id":3,"factoryId":1,"storageCode":"MOL-T01","storageName":"Molasses Tank 1","storageTypeId":1,"storageTypeCode":"TANK","storageTypeName":"Tank","tracksPackages":false,"physicalCapacity":5000,"capacityUom":"TON","minimumStockLevel":0,"safeCapacityPercentage":95,"allowMixedProducts":false,"allowMixedBatches":true,"status":"ACTIVE","effectiveFrom":"1900-01-01T00:00:00Z","remark":"EXAMPLE capacity (requirement section 7) - confirm actual tank volume","version":1},{"id":2,"factoryId":1,"storageCode":"MOL-T02","storageName":"Molasses Tank 2","storageTypeId":1,"storageTypeCode":"TANK","storageTypeName":"Tank","tracksPackages":false,"physicalCapacity":5000,"capacityUom":"TON","minimumStockLevel":0,"safeCapacityPercentage":95,"allowMixedProducts":false,"allowMixedBatches":true,"status":"ACTIVE","effectiveFrom":"1900-01-01T00:00:00Z","remark":"EXAMPLE capacity (requirement section 7) - confirm actual tank volume","version":1},{"id":1,"factoryId":1,"storageCode":"MOL-T03","storageName":"Molasses Tank 3","storageTypeId":1,"storageTypeCode":"TANK","storageTypeName":"Tank","tracksPackages":false,"physicalCapacity":5000,"capacityUom":"TON","minimumStockLevel":0,"safeCapacityPercentage":95,"allowMixedProducts":false,"allowMixedBatches":true,"status":"ACTIVE","effectiveFrom":"1900-01-01T00:00:00Z","remark":"EXAMPLE capacity (requirement section 7) - confirm actual tank volume","version":1}],"capacities":[{"id":1,"storageLocationId":6,"storageCode":"CON-S01","storageName":"Conditioning Silo 1","productId":3,"productCode":"REFINED-SUGAR","productName":"Refined Sugar","packagingTypeId":1,"packagingCode":"PKG-BULK","packagingDescription":"Bulk / Unpacked","weightPerPackage":0,"maximumWeightQuantity":2000,"minimumStockQuantity":0,"weightUom":"TON","effectiveFrom":"1900-01-01T00:00:00Z","status":"ACTIVE","remark":"Weight-managed; no bag count","version":1},{"id":11,"storageLocationId":9,"storageCode":"FG-WH01","storageName":"Finished Sugar Warehouse 1","productId":3,"productCode":"REFINED-SUGAR","productName":"Refined Sugar","packagingTypeId":3,"packagingCode":"PKG-50KG","packagingDescription":"50 KG Bag","weightPerPackage":0.05,"maximumPackageQuantity":200000,"maximumWeightQuantity":10000,"minimumStockQuantity":0,"weightUom":"TON","effectiveFrom":"1900-01-01T00:00:00Z","status":"ACTIVE","remark":"EXAMPLE from requirement section 12","version":1},{"id":14,"storageLocationId":9,"storageCode":"FG-WH01","storageName":"Finished Sugar Warehouse 1","productId":3,"productCode":"REFINED-SUGAR","productName":"Refined Sugar","packagingTypeId":6,"packagingCode":"PKG-JUMBO","packagingDescription":"Jumbo Bag 1.1 T","weightPerPackage":1.1,"maximumPackageQuantity":5000,"maximumWeightQuantity":5500,"minimumStockQuantity":0,"weightUom":"TON","effectiveFrom":"1900-01-01T00:00:00Z","status":"ACTIVE","remark":"EXAMPLE from requirement section 12","version":1},{"id":9,"storageLocationId":9,"storageCode":"FG-WH01","storageName":"Finished Sugar Warehouse 1","productId":4,"productCode":"WHITE-SUGAR","productName":"White Sugar","packagingTypeId":3,"packagingCode":"PKG-50KG","packagingDescription":"50 KG Bag","weightPerPackage":0.05,"maximumPackageQuantity":100000,"maximumWeightQuantity":5000,"minimumStockQuantity":0,"weightUom":"TON","effectiveFrom":"1900-01-01T00:00:00Z","status":"ACTIVE","remark":"EXAMPLE from requirement section 12","version":1},{"id":10,"storageLocationId":7,"storageCode":"FG-WH03","storageName":"Finished Sugar Warehouse 3","productId":3,"productCode":"REFINED-SUGAR","productName":"Refined Sugar","packagingTypeId":3,"packagingCode":"PKG-50KG","packagingDescription":"50 KG Bag","weightPerPackage":0.05,"maximumPackageQuantity":400000,"maximumWeightQuantity":20000,"minimumStockQuantity":0,"weightUom":"TON","effectiveFrom":"1900-01-01T00:00:00Z","status":"ACTIVE","remark":"Derived from physical capacity - confirm product split","version":1},{"id":13,"storageLocationId":7,"storageCode":"FG-WH03","storageName":"Finished Sugar Warehouse 3","productId":3,"productCode":"REFINED-SUGAR","productName":"Refined Sugar","packagingTypeId":6,"packagingCode":"PKG-JUMBO","packagingDescription":"Jumbo Bag 1.1 T","weightPerPackage":1.1,"maximumPackageQuantity":6000,"maximumWeightQuantity":6600,"minimumStockQuantity":0,"weightUom":"TON","effectiveFrom":"1900-01-01T00:00:00Z","status":"ACTIVE","remark":"EXAMPLE from requirement section 12","version":1},{"id":7,"storageLocationId":7,"storageCode":"FG-WH03","storageName":"Finished Sugar Warehouse 3","productId":5,"productCode":"SUPER-REFINED","productName":"Super Refined Sugar","packagingTypeId":3,"packagingCode":"PKG-50KG","packagingDescription":"50 KG Bag","weightPerPackage":0.05,"maximumPackageQuantity":40000,"maximumWeightQuantity":2000,"minimumStockQuantity":0,"weightUom":"TON","effectiveFrom":"1900-01-01T00:00:00Z","status":"ACTIVE","remark":"Sized for the 2,000 t remelt-period super refined programme","version":1},{"id":8,"storageLocationId":7,"storageCode":"FG-WH03","storageName":"Finished Sugar Warehouse 3","productId":4,"productCode":"WHITE-SUGAR","productName":"White Sugar","packagingTypeId":3,"packagingCode":"PKG-50KG","packagingDescription":"50 KG Bag","weightPerPackage":0.05,"maximumPackageQuantity":540000,"maximumWeightQuantity":27000,"minimumStockQuantity":0,"weightUom":"TON","effectiveFrom":"1900-01-01T00:00:00Z","status":"ACTIVE","remark":"Derived from physical capacity - confirm product split","version":1},{"id":12,"storageLocationId":7,"storageCode":"FG-WH03","storageName":"Finished Sugar Warehouse 3","productId":4,"productCode":"WHITE-SUGAR","productName":"White Sugar","packagingTypeId":6,"packagingCode":"PKG-JUMBO","packagingDescription":"Jumbo Bag 1.1 T","weightPerPackage":1.1,"maximumPackageQuantity":6000,"maximumWeightQuantity":6600,"minimumStockQuantity":0,"weightUom":"TON","effectiveFrom":"1900-01-01T00:00:00Z","status":"ACTIVE","remark":"EXAMPLE from requirement section 12","version":1},{"id":6,"storageLocationId":3,"storageCode":"MOL-T01","storageName":"Molasses Tank 1","productId":1,"productCode":"MOLASSES","productName":"Molasses","packagingTypeId":1,"packagingCode":"PKG-BULK","packagingDescription":"Bulk / Unpacked","weightPerPackage":0,"maximumWeightQuantity":5000,"minimumStockQuantity":0,"weightUom":"TON","effectiveFrom":"1900-01-01T00:00:00Z","status":"ACTIVE","remark":"Whole tank available to molasses","version":1},{"id":5,"storageLocationId":2,"storageCode":"MOL-T02","storageName":"Molasses Tank 2","productId":1,"productCode":"MOLASSES","productName":"Molasses","packagingTypeId":1,"packagingCode":"PKG-BULK","packagingDescription":"Bulk / Unpacked","weightPerPackage":0,"maximumWeightQuantity":5000,"minimumStockQuantity":0,"weightUom":"TON","effectiveFrom":"1900-01-01T00:00:00Z","status":"ACTIVE","remark":"Whole tank available to molasses","version":1},{"id":4,"storageLocationId":1,"storageCode":"MOL-T03","storageName":"Molasses Tank 3","productId":1,"productCode":"MOLASSES","productName":"Molasses","packagingTypeId":1,"packagingCode":"PKG-BULK","packagingDescription":"Bulk / Unpacked","weightPerPackage":0,"maximumWeightQuantity":5000,"minimumStockQuantity":0,"weightUom":"TON","effectiveFrom":"1900-01-01T00:00:00Z","status":"ACTIVE","remark":"Whole tank available to molasses","version":1},{"id":3,"storageLocationId":5,"storageCode":"RAW-WH01","storageName":"Raw Sugar Warehouse 1","productId":2,"productCode":"RAW-SUGAR","productName":"Raw Sugar","packagingTypeId":1,"packagingCode":"PKG-BULK","packagingDescription":"Bulk / Unpacked","weightPerPackage":0,"maximumWeightQuantity":30000,"minimumStockQuantity":0,"weightUom":"TON","effectiveFrom":"1900-01-01T00:00:00Z","status":"ACTIVE","remark":"EXAMPLE split from requirement section 8","version":1},{"id":16,"storageLocationId":5,"storageCode":"RAW-WH01","storageName":"Raw Sugar Warehouse 1","productId":2,"productCode":"RAW-SUGAR","productName":"Raw Sugar","packagingTypeId":6,"packagingCode":"PKG-JUMBO","packagingDescription":"Jumbo Bag 1.1 T","weightPerPackage":1.1,"maximumPackageQuantity":10000,"maximumWeightQuantity":11000,"minimumStockQuantity":0,"weightUom":"TON","effectiveFrom":"1900-01-01T00:00:00Z","status":"ACTIVE","remark":"EXAMPLE split from requirement section 8: 10,000 bags x 1.1 t","version":1},{"id":2,"storageLocationId":4,"storageCode":"RAW-WH02","storageName":"Raw Sugar Warehouse 2","productId":2,"productCode":"RAW-SUGAR","productName":"Raw Sugar","packagingTypeId":1,"packagingCode":"PKG-BULK","packagingDescription":"Bulk / Unpacked","weightPerPackage":0,"maximumWeightQuantity":45000,"minimumStockQuantity":0,"weightUom":"TON","effectiveFrom":"1900-01-01T00:00:00Z","status":"ACTIVE","remark":"Derived from physical capacity - confirm bulk/jumbo split","version":1},{"id":15,"storageLocationId":4,"storageCode":"RAW-WH02","storageName":"Raw Sugar Warehouse 2","productId":2,"productCode":"RAW-SUGAR","productName":"Raw Sugar","packagingTypeId":6,"packagingCode":"PKG-JUMBO","packagingDescription":"Jumbo Bag 1.1 T","weightPerPackage":1.1,"maximumPackageQuantity":18182,"maximumWeightQuantity":20000,"minimumStockQuantity":0,"weightUom":"TON","effectiveFrom":"1900-01-01T00:00:00Z","status":"ACTIVE","remark":"Sized for the 20,700 t jumbo bag programme (21-Jan to 30-Mar-2027)","version":1}],"packaging":[{"id":1,"code":"PKG-BULK","description":"Bulk / Unpacked","netWeight":0,"netWeightUom":"KG","weightInTon":0,"isBulk":true,"status":"ACTIVE","version":1},{"id":2,"code":"PKG-25KG","description":"25 KG Bag","netWeight":25,"netWeightUom":"KG","weightInTon":0.025,"isBulk":false,"status":"ACTIVE","version":1},{"id":3,"code":"PKG-50KG","description":"50 KG Bag","netWeight":50,"netWeightUom":"KG","weightInTon":0.05,"isBulk":false,"status":"ACTIVE","version":1},{"id":4,"code":"PKG-500KG","description":"500 KG Bag","netWeight":500,"netWeightUom":"KG","weightInTon":0.5,"isBulk":false,"status":"ACTIVE","version":1},{"id":5,"code":"PKG-1000KG","description":"1,000 KG Bag","netWeight":1000,"netWeightUom":"KG","weightInTon":1,"isBulk":false,"status":"ACTIVE","version":1},{"id":6,"code":"PKG-JUMBO","description":"Jumbo Bag 1.1 T","netWeight":1100,"netWeightUom":"KG","weightInTon":1.1,"isBulk":false,"status":"ACTIVE","version":1}],"thresholds":[{"code":"NORMAL","name":"Normal","severity":"NORMAL","uiState":"Success","fromPercentage":0,"toPercentage":80},{"code":"WARNING","name":"Warning","severity":"WARNING","uiState":"Warning","fromPercentage":80,"toPercentage":90},{"code":"HIGH","name":"High","severity":"HIGH","uiState":"Warning","fromPercentage":90,"toPercentage":95},{"code":"CRITICAL","name":"Critical","severity":"CRITICAL","uiState":"Error","fromPercentage":95,"toPercentage":100},{"code":"FULL","name":"Full","severity":"FULL","uiState":"Error","fromPercentage":100}],"production":[{"id":72,"seasonId":1,"factoryId":1,"planDate":"2027-02-10T00:00:00Z","dayNo":72,"caneTarget":19000,"caneActual":0,"rawSugarTarget":2090,"rawSugarActual":0,"rawToRemeltTarget":945,"rawSiloToRemeltTarget":0,"rawPackingTarget":300,"refinedSugarTarget":400,"whiteSugarTarget":500,"superRefinedTarget":0,"quotaSalesTarget":500,"isCleaningDay":false,"remark":""},{"id":73,"seasonId":1,"factoryId":1,"planDate":"2027-02-11T00:00:00Z","dayNo":73,"caneTarget":19000,"caneActual":0,"rawSugarTarget":2090,"rawSugarActual":0,"rawToRemeltTarget":945,"rawSiloToRemeltTarget":0,"rawPackingTarget":300,"refinedSugarTarget":400,"whiteSugarTarget":500,"superRefinedTarget":0,"quotaSalesTarget":500,"isCleaningDay":false,"remark":""},{"id":74,"seasonId":1,"factoryId":1,"planDate":"2027-02-12T00:00:00Z","dayNo":74,"caneTarget":19000,"caneActual":0,"rawSugarTarget":2090,"rawSugarActual":0,"rawToRemeltTarget":945,"rawSiloToRemeltTarget":0,"rawPackingTarget":300,"refinedSugarTarget":400,"whiteSugarTarget":500,"superRefinedTarget":0,"quotaSalesTarget":500,"isCleaningDay":false,"remark":""},{"id":75,"seasonId":1,"factoryId":1,"planDate":"2027-02-13T00:00:00Z","dayNo":75,"caneTarget":19000,"caneActual":0,"rawSugarTarget":2090,"rawSugarActual":0,"rawToRemeltTarget":945,"rawSiloToRemeltTarget":0,"rawPackingTarget":300,"refinedSugarTarget":400,"whiteSugarTarget":500,"superRefinedTarget":0,"quotaSalesTarget":500,"isCleaningDay":false,"remark":""},{"id":76,"seasonId":1,"factoryId":1,"planDate":"2027-02-14T00:00:00Z","dayNo":76,"caneTarget":19000,"caneActual":0,"rawSugarTarget":2090,"rawSugarActual":0,"rawToRemeltTarget":945,"rawSiloToRemeltTarget":0,"rawPackingTarget":300,"refinedSugarTarget":400,"whiteSugarTarget":500,"superRefinedTarget":0,"quotaSalesTarget":500,"isCleaningDay":false,"remark":""},{"id":77,"seasonId":1,"factoryId":1,"planDate":"2027-02-15T00:00:00Z","dayNo":77,"caneTarget":19000,"caneActual":0,"rawSugarTarget":2090,"rawSugarActual":0,"rawToRemeltTarget":945,"rawSiloToRemeltTarget":0,"rawPackingTarget":300,"refinedSugarTarget":400,"whiteSugarTarget":500,"superRefinedTarget":0,"quotaSalesTarget":500,"isCleaningDay":false,"remark":""},{"id":78,"seasonId":1,"factoryId":1,"planDate":"2027-02-16T00:00:00Z","dayNo":78,"caneTarget":19000,"caneActual":0,"rawSugarTarget":2090,"rawSugarActual":0,"rawToRemeltTarget":945,"rawSiloToRemeltTarget":0,"rawPackingTarget":300,"refinedSugarTarget":400,"whiteSugarTarget":500,"superRefinedTarget":0,"quotaSalesTarget":500,"isCleaningDay":false,"remark":""},{"id":79,"seasonId":1,"factoryId":1,"planDate":"2027-02-17T00:00:00Z","dayNo":79,"caneTarget":19000,"caneActual":0,"rawSugarTarget":2090,"rawSugarActual":0,"rawToRemeltTarget":945,"rawSiloToRemeltTarget":0,"rawPackingTarget":300,"refinedSugarTarget":400,"whiteSugarTarget":500,"superRefinedTarget":0,"quotaSalesTarget":500,"isCleaningDay":false,"remark":""},{"id":80,"seasonId":1,"factoryId":1,"planDate":"2027-02-18T00:00:00Z","dayNo":80,"caneTarget":19000,"caneActual":0,"rawSugarTarget":2090,"rawSugarActual":0,"rawToRemeltTarget":945,"rawSiloToRemeltTarget":0,"rawPackingTarget":300,"refinedSugarTarget":400,"whiteSugarTarget":500,"superRefinedTarget":0,"quotaSalesTarget":500,"isCleaningDay":false,"remark":""},{"id":81,"seasonId":1,"factoryId":1,"planDate":"2027-02-19T00:00:00Z","dayNo":81,"caneTarget":19000,"caneActual":0,"rawSugarTarget":2090,"rawSugarActual":0,"rawToRemeltTarget":945,"rawSiloToRemeltTarget":0,"rawPackingTarget":300,"refinedSugarTarget":400,"whiteSugarTarget":500,"superRefinedTarget":0,"quotaSalesTarget":500,"isCleaningDay":false,"remark":""},{"id":82,"seasonId":1,"factoryId":1,"planDate":"2027-02-20T00:00:00Z","dayNo":82,"caneTarget":19000,"caneActual":0,"rawSugarTarget":2090,"rawSugarActual":0,"rawToRemeltTarget":945,"rawSiloToRemeltTarget":0,"rawPackingTarget":300,"refinedSugarTarget":400,"whiteSugarTarget":500,"superRefinedTarget":0,"quotaSalesTarget":500,"isCleaningDay":false,"remark":""}],"projections":{"FG-POOL":{"scopeCode":"FG-POOL","scopeName":"Finished Sugar Warehouses (W1 + W3)","capacity":69000,"safeCapacity":65550,"peakClosing":106500,"peakDate":"2027-08-29","firstSafe":"2027-05-19","firstPhysical":"2027-05-28","horizons":[{"label":"Today","date":"2026-12-01","closing":0,"pct":0,"avail":65550,"sev":"NORMAL"},{"label":"+1 Day","date":"2026-12-02","closing":0,"pct":0,"avail":65550,"sev":"NORMAL"},{"label":"+3 Days","date":"2026-12-04","closing":0,"pct":0,"avail":65550,"sev":"NORMAL"},{"label":"+7 Days","date":"2026-12-08","closing":1000,"pct":1.45,"avail":64550,"sev":"NORMAL"},{"label":"End of Month","date":"2026-12-31","closing":10100,"pct":14.64,"avail":55450,"sev":"NORMAL"},{"label":"End of Season","date":"2027-09-02","closing":106150,"pct":153.84,"avail":-40600,"sev":"FULL"}],"d":["2026-12-01","2026-12-02","2026-12-03","2026-12-04","2026-12-05","2026-12-06","2026-12-07","2026-12-08","2026-12-09","2026-12-10","2026-12-11","2026-12-12","2026-12-13","2026-12-14","2026-12-15","2026-12-16","2026-12-17","2026-12-18","2026-12-19","2026-12-20","2026-12-21","2026-12-22","2026-12-23","2026-12-24","2026-12-25","2026-12-26","2026-12-27","2026-12-28","2026-12-29","2026-12-30","2026-12-31","2027-01-01","2027-01-02","2027-01-03","2027-01-04","2027-01-05","2027-01-06","2027-01-07","2027-01-08","2027-01-09","2027-01-10","2027-01-11","2027-01-12","2027-01-13","2027-01-14","2027-01-15","2027-01-16","2027-01-17","2027-01-18","2027-01-19","2027-01-20","2027-01-21","2027-01-22","2027-01-23","2027-01-24","2027-01-25","2027-01-26","2027-01-27","2027-01-28","2027-01-29","2027-01-30","2027-01-31","2027-02-01","2027-02-02","2027-02-03","2027-02-04","2027-02-05","2027-02-06","2027-02-07","2027-02-08","2027-02-09","2027-02-10","2027-02-11","2027-02-12","2027-02-13","2027-02-14","2027-02-15","2027-02-16","2027-02-17","2027-02-18","2027-02-19","2027-02-20","2027-02-21","2027-02-22","2027-02-23","2027-02-24","2027-02-25","2027-02-26","2027-02-27","2027-02-28","2027-03-01","2027-03-02","2027-03-03","2027-03-04","2027-03-05","2027-03-06","2027-03-07","2027-03-08","2027-03-09","2027-03-10","2027-03-11","2027-03-12","2027-03-13","2027-03-14","2027-03-15","2027-03-16","2027-03-17","2027-03-18","2027-03-19","2027-03-20","2027-03-21","2027-03-22","2027-03-23","2027-03-24","2027-03-25","2027-03-26","2027-03-27","2027-03-28","2027-03-29","2027-03-30","2027-03-31","2027-04-01","2027-04-02","2027-04-03","2027-04-04","2027-04-05","2027-04-06","2027-04-07","2027-04-08","2027-04-09","2027-04-10","2027-04-11","2027-04-12","2027-04-13","2027-04-14","2027-04-15","2027-04-16","2027-04-17","2027-04-18","2027-04-19","2027-04-20","2027-04-21","2027-04-22","2027-04-23","2027-04-24","2027-04-25","2027-04-26","2027-04-27","2027-04-28","2027-04-29","2027-04-30","2027-05-01","2027-05-02","2027-05-03","2027-05-04","2027-05-05","2027-05-06","2027-05-07","2027-05-08","2027-05-09","2027-05-10","2027-05-11","2027-05-12","2027-05-13","2027-05-14","2027-05-15","2027-05-16","2027-05-17","2027-05-18","2027-05-19","2027-05-20","2027-05-21","2027-05-22","2027-05-23","2027-05-24","2027-05-25","2027-05-26","2027-05-27","2027-05-28","2027-05-29","2027-05-30","2027-05-31","2027-06-01","2027-06-02","2027-06-03","2027-06-04","2027-06-05","2027-06-06","2027-06-07","2027-06-08","2027-06-09","2027-06-10","2027-06-11","2027-06-12","2027-06-13","2027-06-14","2027-06-15","2027-06-16","2027-06-17","2027-06-18","2027-06-19","2027-06-20","2027-06-21","2027-06-22","2027-06-23","2027-06-24","2027-06-25","2027-06-26","2027-06-27","2027-06-28","2027-06-29","2027-06-30","2027-07-01","2027-07-02","2027-07-03","2027-07-04","2027-07-05","2027-07-06","2027-07-07","2027-07-08","2027-07-09","2027-07-10","2027-07-11","2027-07-12","2027-07-13","2027-07-14","2027-07-15","2027-07-16","2027-07-17","2027-07-18","2027-07-19","2027-07-20","2027-07-21","2027-07-22","2027-07-23","2027-07-24","2027-07-25","2027-07-26","2027-07-27","2027-07-28","2027-07-29","2027-07-30","2027-07-31","2027-08-01","2027-08-02","2027-08-03","2027-08-04","2027-08-05","2027-08-06","2027-08-07","2027-08-08","2027-08-09","2027-08-10","2027-08-11","2027-08-12","2027-08-13","2027-08-14","2027-08-15","2027-08-16","2027-08-17","2027-08-18","2027-08-19","2027-08-20","2027-08-21","2027-08-22","2027-08-23","2027-08-24","2027-08-25","2027-08-26","2027-08-27","2027-08-28","2027-08-29","2027-08-30","2027-08-31","2027-09-01","2027-09-02"],"c":[0,0,0,0,200,400,700,1000,1300,1700,2100,2500,2900,3300,3700,4100,4500,4900,5300,5700,6100,6500,6900,7300,7700,8100,8500,8900,9300,9700,10100,10500,10900,11300,11700,12100,12500,12900,13300,13700,14100,14500,14900,15300,15700,16100,16500,16900,17300,17700,18100,18500,18900,19300,19700,20100,20500,20900,21300,21700,22100,22500,22900,23300,23700,24100,24500,24900,25300,25700,26100,26500,26900,27300,27700,28100,28500,28900,29300,29700,30100,30500,30900,31300,31700,32100,32500,32900,33300,33700,34100,34500,34900,35300,35700,36100,36500,36900,37300,37700,38100,38500,38900,39300,39700,40100,40500,40900,41300,41700,42100,42500,42900,43300,43700,44100,44500,44900,45300,45700,46100,46500,46900,47300,47700,48100,48500,48900,49300,49700,50100,50500,50900,51300,51700,52100,52500,52900,53300,53700,54100,54500,54900,55300,55700,56100,56500,56900,57300,57700,58100,58500,58900,59300,59700,60100,60500,60900,61300,61700,62100,62500,62900,63300,63700,64100,64500,64900,65300,65700,66100,66500,66900,67300,67700,68100,68500,68900,69300,69700,70100,70500,70900,71300,71700,72100,72500,72900,73300,73700,74100,74500,74900,75300,75700,76100,76500,76900,77300,77700,78100,78500,78900,79300,79700,80100,80500,80900,81300,81700,82100,82500,82900,83300,83700,84100,84500,84900,85300,85700,86100,86500,86900,87300,87700,88100,88500,88900,89300,89700,90100,90500,90900,91300,91700,92100,92500,92900,93300,93700,94100,94500,94900,95300,95700,96100,96500,96900,97300,97700,98100,98500,98900,99300,99700,100100,100500,100900,101300,101700,102100,102500,102900,103300,103700,104100,104500,104900,105300,105700,106100,106500,106450,106350,106250,106150]},"RAW-POOL":{"scopeCode":"RAW-POOL","scopeName":"Raw Sugar Warehouses (W1 + W2)","capacity":110000,"safeCapacity":104500,"peakClosing":109720,"peakDate":"2027-04-10","firstSafe":"2027-04-02","firstPhysical":"","horizons":[{"label":"Today","date":"2026-12-01","closing":1870,"pct":1.7,"avail":102630,"sev":"NORMAL"},{"label":"+1 Day","date":"2026-12-02","closing":3740,"pct":3.4,"avail":100760,"sev":"NORMAL"},{"label":"+3 Days","date":"2026-12-04","closing":7920,"pct":7.2,"avail":96580,"sev":"NORMAL"},{"label":"+7 Days","date":"2026-12-08","closing":13130,"pct":11.94,"avail":91370,"sev":"NORMAL"},{"label":"End of Month","date":"2026-12-31","closing":36380,"pct":33.07,"avail":68120,"sev":"NORMAL"},{"label":"End of Season","date":"2027-04-16","closing":107350,"pct":97.59,"avail":-2850,"sev":"CRITICAL"}],"d":["2026-12-01","2026-12-02","2026-12-03","2026-12-04","2026-12-05","2026-12-06","2026-12-07","2026-12-08","2026-12-09","2026-12-10","2026-12-11","2026-12-12","2026-12-13","2026-12-14","2026-12-15","2026-12-16","2026-12-17","2026-12-18","2026-12-19","2026-12-20","2026-12-21","2026-12-22","2026-12-23","2026-12-24","2026-12-25","2026-12-26","2026-12-27","2026-12-28","2026-12-29","2026-12-30","2026-12-31","2027-01-01","2027-01-02","2027-01-03","2027-01-04","2027-01-05","2027-01-06","2027-01-07","2027-01-08","2027-01-09","2027-01-10","2027-01-11","2027-01-12","2027-01-13","2027-01-14","2027-01-15","2027-01-16","2027-01-17","2027-01-18","2027-01-19","2027-01-20","2027-01-21","2027-01-22","2027-01-23","2027-01-24","2027-01-25","2027-01-26","2027-01-27","2027-01-28","2027-01-29","2027-01-30","2027-01-31","2027-02-01","2027-02-02","2027-02-03","2027-02-04","2027-02-05","2027-02-06","2027-02-07","2027-02-08","2027-02-09","2027-02-10","2027-02-11","2027-02-12","2027-02-13","2027-02-14","2027-02-15","2027-02-16","2027-02-17","2027-02-18","2027-02-19","2027-02-20","2027-02-21","2027-02-22","2027-02-23","2027-02-24","2027-02-25","2027-02-26","2027-02-27","2027-02-28","2027-03-01","2027-03-02","2027-03-03","2027-03-04","2027-03-05","2027-03-06","2027-03-07","2027-03-08","2027-03-09","2027-03-10","2027-03-11","2027-03-12","2027-03-13","2027-03-14","2027-03-15","2027-03-16","2027-03-17","2027-03-18","2027-03-19","2027-03-20","2027-03-21","2027-03-22","2027-03-23","2027-03-24","2027-03-25","2027-03-26","2027-03-27","2027-03-28","2027-03-29","2027-03-30","2027-03-31","2027-04-01","2027-04-02","2027-04-03","2027-04-04","2027-04-05","2027-04-06","2027-04-07","2027-04-08","2027-04-09","2027-04-10","2027-04-11","2027-04-12","2027-04-13","2027-04-14","2027-04-15","2027-04-16"],"c":[1870,3740,5830,7920,9275,10630,11880,13130,14380,15525,16670,17815,18960,20105,21250,22395,23540,24685,25830,25875,24930,26075,27220,28365,29510,30655,31800,32945,34090,35235,36380,37525,38670,39815,40960,42105,43250,44395,45540,46685,46730,45785,46930,48075,49220,50365,51510,52655,53800,54945,56090,56935,57780,58625,59470,60315,61160,62005,62850,63695,64540,64285,63040,63885,64730,65575,66420,67265,68110,68955,69800,70645,71490,72335,73180,74025,74870,75715,76560,77405,78250,79095,78840,77595,78440,79285,80130,80975,81820,82665,83510,84355,85200,86045,86890,87735,88580,89425,90270,91115,91960,92805,93650,93395,92150,92995,93840,94685,95530,96375,97220,98065,98910,99755,100600,101445,102290,102035,100790,101635,102780,103925,105070,105775,106480,107185,107890,108595,108970,109345,109720,109655,109590,109085,108580,107965,107350]}}};</script>
+<script>
+(function () {
+  "use strict";
+
+  const D = window.__SPP__;
+
+  // ── formatting ──────────────────────────────────────────────────────
+  const grp = (n, dp) => n.toLocaleString("en-US", { minimumFractionDigits: dp, maximumFractionDigits: dp });
+  const t   = n => (n == null ? "—" : grp(n, Number.isInteger(n) ? 0 : 1) + " t");
+  const pkg = n => (!n ? "—" : grp(Math.round(n), 0));
+  const pct = n => (n == null ? "—" : grp(n, n % 1 === 0 ? 0 : 2) + "%");
+  const day = s => (!s ? "—" : new Date(s).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }));
+  const el  = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+
+  function table(node, cols, rows) {
+    node.innerHTML = "";
+    const thead = el("thead"), tr = el("tr");
+    cols.forEach(c => { const th = el("th", c.n ? "n" : null, c.h); tr.appendChild(th); });
+    thead.appendChild(tr); node.appendChild(thead);
+    const tb = el("tbody");
+    rows.forEach(r => {
+      const row = el("tr");
+      cols.forEach(c => {
+        const cell = el("td", [c.n ? "n" : "", c.strong ? "strong" : ""].filter(Boolean).join(" "));
+        const v = c.get(r);
+        if (v instanceof Node) cell.appendChild(v); else cell.textContent = v;
+        row.appendChild(cell);
+      });
+      tb.appendChild(row);
+    });
+    node.appendChild(tb);
+  }
+
+  const chip = sev => el("span", "chip sev-" + sev, sev);
+
+  // ── rail ────────────────────────────────────────────────────────────
+  const screens = [
+    ["dashboard",    "Dashboard"],
+    ["projection",   "Projection"],
+    ["planvsactual", "Plan vs Actual"],
+    ["remelt",       "Remelt"],
+    ["masterdata",   "Master Data"],
+  ];
+  const rail = document.getElementById("rail");
+  screens.forEach(([id, label], i) => {
+    const b = el("button", null);
+    b.type = "button";
+    b.appendChild(el("span", "idx", String(i + 1).padStart(2, "0")));
+    b.appendChild(el("span", null, label));
+    b.setAttribute("aria-current", id === "dashboard" ? "true" : "false");
+    b.addEventListener("click", () => {
+      screens.forEach(([o]) => document.getElementById("p-" + o).dataset.active = String(o === id));
+      [...rail.children].forEach((c, j) => c.setAttribute("aria-current", String(screens[j][0] === id)));
+      if (id === "projection") drawChart();
+    });
+    rail.appendChild(b);
+  });
+
+  // ── dashboard: pools ────────────────────────────────────────────────
+  document.getElementById("asOf").textContent = "Stock as planned for 15 Feb 2027";
+
+  const pools = document.getElementById("pools");
+  D.dashboard.groups.forEach(g => {
+    const u = g.utilization, sev = u.band.severity;
+    const card = el("div", "card pool");
+
+    const top = el("div", "pool-top");
+    const left = el("div");
+    left.appendChild(el("h3", null, g.groupName));
+    left.appendChild(el("div", "sub", g.memberCodes.join(" + ")));
+    top.appendChild(left);
+    top.appendChild(chip(sev));
+    card.appendChild(top);
+
+    const read = el("div", "readout");
+    read.appendChild(el("span", "big", pct(u.utilizationPercentage).replace("%", "")));
+    read.appendChild(el("span", "unit", "% full"));
+    card.appendChild(read);
+
+    const bar = el("div", "bar");
+    const fill = el("i", "fill-" + sev);
+    fill.style.width = Math.min(100, u.utilizationPercentage) + "%";
+    bar.appendChild(fill);
+    const safe = el("b");
+    safe.style.left = (u.safeCapacity / u.capacity * 100) + "%";
+    safe.title = "Safe capacity " + t(u.safeCapacity);
+    bar.appendChild(safe);
+    card.appendChild(bar);
+
+    const row = el("div", "figrow");
+    [["Current", t(u.currentStock)], ["Capacity", t(u.capacity)], ["Available", t(u.availableCapacity)]]
+      .forEach(([k, v]) => { const d = el("div"); d.appendChild(el("div", "label", k)); d.appendChild(el("div", "v", v)); row.appendChild(d); });
+    card.appendChild(row);
+    pools.appendChild(card);
+  });
+
+  // ── dashboard: alerts ───────────────────────────────────────────────
+  const alerts = document.getElementById("alerts");
+  document.getElementById("alertCount").textContent =
+    D.alerts.length + (D.alerts.length === 1 ? " alert" : " alerts") + " above the normal band";
+  D.alerts.forEach(a => {
+    const row = el("div", "alert");
+    row.appendChild(el("div", "stripe fill-" + a.severity));
+    const txt = el("div", "txt");
+    txt.appendChild(el("div", "who", a.scopeName));
+    txt.appendChild(el("div", "msg", a.message));
+    row.appendChild(txt);
+    row.appendChild(chip(a.severity));
+    alerts.appendChild(row);
+  });
+
+  // ── dashboard: vessels ──────────────────────────────────────────────
+  // A tank or silo is drawn upright and fills from the bottom; a warehouse
+  // is drawn as a floor filling across. The gauge matches the vessel.
+  const upright = c => c === "TANK" || c === "CONDITIONING_SILO";
+  const vessels = document.getElementById("vessels");
+  D.dashboard.storages.forEach(s => {
+    const u = s.utilization, sev = u.band.severity;
+    const card = el("div", "card vessel");
+
+    if (upright(s.storageTypeCode)) {
+      const wrap = el("div");
+      const tank = el("div", "tank");
+      const fill = el("i", "fill-" + sev);
+      fill.style.height = Math.min(100, u.utilizationPercentage) + "%";
+      tank.appendChild(fill);
+      const safe = el("b");
+      safe.style.bottom = (u.safeCapacity / u.capacity * 100) + "%";
+      tank.appendChild(safe);
+      wrap.appendChild(tank);
+      wrap.appendChild(el("div", "tank-cap", t(u.capacity)));
+      card.appendChild(wrap);
+    }
+
+    const body = el("div", "body");
+    const head = el("div");
+    head.appendChild(el("h4", null, s.storageName));
+    head.appendChild(el("div", "code", s.storageCode + " · " + s.storageTypeName));
+    body.appendChild(head);
+
+    const pctLine = el("div", "pool-top");
+    pctLine.appendChild(el("div", "pct", pct(u.utilizationPercentage)));
+    pctLine.appendChild(chip(sev));
+    body.appendChild(pctLine);
+
+    if (!upright(s.storageTypeCode)) {
+      const bar = el("div", "bar");
+      const fill = el("i", "fill-" + sev);
+      fill.style.width = Math.min(100, u.utilizationPercentage) + "%";
+      bar.appendChild(fill);
+      const safe = el("b");
+      safe.style.left = (u.safeCapacity / u.capacity * 100) + "%";
+      bar.appendChild(safe);
+      body.appendChild(bar);
+    }
+
+    const row = el("div", "figrow");
+    [["Current", t(u.currentStock)], ["Capacity", t(u.capacity)], ["Free", t(u.availableCapacity)]]
+      .forEach(([k, v]) => { const d = el("div"); d.appendChild(el("div", "label", k)); d.appendChild(el("div", "v", v)); row.appendChild(d); });
+    body.appendChild(row);
+
+    card.appendChild(body);
+    vessels.appendChild(card);
+  });
+
+  // ── dashboard: product capacity ─────────────────────────────────────
+  const lines = [];
+  D.dashboard.storages.forEach(s => (s.products || []).forEach(p => lines.push({ s, p })));
+  table(document.getElementById("productTable"), [
+    { h: "Storage",   get: r => r.s.storageCode, strong: true },
+    { h: "Product",   get: r => r.p.productName },
+    { h: "Packaging", get: r => r.p.packagingDescription },
+    { h: "On hand",   get: r => pkg(r.p.currentPackages), n: true },
+    { h: "Weight",    get: r => t(r.p.currentWeight), n: true },
+    { h: "Max pkg",   get: r => pkg(r.p.maximumPackages), n: true },
+    { h: "Spaces left", get: r => pkg(r.p.availablePackageSpaces), n: true },
+    { h: "Used",      get: r => chip(r.p.band.severity) },
+  ], lines);
+
+  // ── projection ──────────────────────────────────────────────────────
+  let scope = "FG-POOL";
+  const tabs = document.getElementById("scopeTabs");
+  Object.keys(D.projections).forEach(code => {
+    const b = el("button", null, D.projections[code].scopeName);
+    b.type = "button";
+    b.setAttribute("aria-pressed", String(code === scope));
+    b.addEventListener("click", () => {
+      scope = code;
+      [...tabs.children].forEach((c, i) => c.setAttribute("aria-pressed", String(Object.keys(D.projections)[i] === code)));
+      drawChart();
+    });
+    tabs.appendChild(b);
+  });
+
+  function drawChart() {
+    const p = D.projections[scope];
+    const svg = document.getElementById("chart");
+    const W = svg.clientWidth || 800, H = 210, padL = 54, padR = 14, padT = 12, padB = 24;
+    const iw = W - padL - padR, ih = H - padT - padB;
+    const maxY = Math.max(p.capacity, p.peakClosing) * 1.06;
+    const x = i => padL + (i / (p.c.length - 1)) * iw;
+    const y = v => padT + ih - (v / maxY) * ih;
+
+    const ns = "http://www.w3.org/2000/svg";
+    const mk = (n, a) => { const e = document.createElementNS(ns, n); for (const k in a) e.setAttribute(k, a[k]); return e; };
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    [...svg.querySelectorAll(":not(title)")].forEach(n => n.remove());
+
+    // horizontal grid + y labels
+    for (let i = 0; i <= 4; i++) {
+      const v = (maxY / 4) * i;
+      svg.appendChild(mk("line", { class: "grid-line", x1: padL, x2: W - padR, y1: y(v), y2: y(v) }));
+      const lb = mk("text", { x: padL - 7, y: y(v) + 3, "text-anchor": "end" });
+      lb.textContent = Math.round(v / 1000) + "k";
+      svg.appendChild(lb);
+    }
+
+    // area + curve
+    let d = "", a = `M ${x(0)} ${y(0)}`;
+    p.c.forEach((v, i) => { const cmd = i ? "L" : "M"; d += `${cmd} ${x(i)} ${y(v)} `; a += ` L ${x(i)} ${y(v)}`; });
+    a += ` L ${x(p.c.length - 1)} ${y(0)} Z`;
+    svg.appendChild(mk("path", { class: "area", d: a }));
+    svg.appendChild(mk("path", { class: "curve", d: d.trim() }));
+
+    // ceilings
+    svg.appendChild(mk("line", { class: "ceiling", x1: padL, x2: W - padR, y1: y(p.capacity), y2: y(p.capacity) }));
+    svg.appendChild(mk("line", { class: "safe",    x1: padL, x2: W - padR, y1: y(p.safeCapacity), y2: y(p.safeCapacity) }));
+
+    // breach marker
+    if (p.firstPhysical) {
+      const i = p.d.indexOf(p.firstPhysical);
+      if (i >= 0) {
+        svg.appendChild(mk("line", {
+          class: "ceiling", x1: x(i), x2: x(i), y1: padT, y2: y(p.c[i]),
+        }));
+        svg.appendChild(mk("circle", { class: "breach", cx: x(i), cy: y(p.c[i]), r: 4 }));
+        const right = x(i) < W - padR - 130;
+        const lb = mk("text", {
+          x: x(i) + (right ? 7 : -7), y: padT + 10,
+          "text-anchor": right ? "start" : "end",
+        });
+        lb.setAttribute("fill", "var(--critical)");
+        lb.textContent = "over capacity " + day(p.firstPhysical);
+        svg.appendChild(lb);
+      }
+    }
+
+    // x labels: first, middle, last
+    [0, Math.floor(p.d.length / 2), p.d.length - 1].forEach((i, k) => {
+      const lb = mk("text", { x: x(i), y: H - 6, "text-anchor": k === 0 ? "start" : k === 2 ? "end" : "middle" });
+      lb.textContent = new Date(p.d[i]).toLocaleDateString("en-GB", { month: "short", year: "2-digit" });
+      svg.appendChild(lb);
+    });
+
+    const hz = document.getElementById("horizons");
+    hz.innerHTML = "";
+    p.horizons.forEach(h => {
+      const pill = el("div", "pill wash-" + h.sev);
+      pill.appendChild(el("div", "label", h.label));
+      pill.appendChild(el("div", "v", t(h.closing)));
+      pill.appendChild(el("div", "label", pct(h.pct)));
+      hz.appendChild(pill);
+    });
+  }
+  window.addEventListener("resize", () => { if (document.getElementById("p-projection").dataset.active === "true") drawChart(); });
+
+  // ── plan vs actual ──────────────────────────────────────────────────
+  const signed = v => (v > 0 ? "+" : "") + grp(v, v % 1 === 0 ? 0 : 1) + " t";
+  table(document.getElementById("pvaTable"), [
+    { h: "Scope",      get: r => r.scopeCode, strong: true },
+    { h: "Opening",    get: r => t(r.opening), n: true },
+    { h: "Plan in",    get: r => t(r.plannedIn), n: true },
+    { h: "Actual in",  get: r => t(r.actualIn), n: true },
+    { h: "Plan out",   get: r => t(r.plannedOut), n: true },
+    { h: "Actual out", get: r => t(r.actualOut), n: true },
+    { h: "Plan close", get: r => t(r.plannedClosing), n: true },
+    { h: "Actual close", get: r => t(r.actualClosing), n: true },
+    { h: "Variance",   get: r => signed(r.variance), n: true },
+    { h: "Capacity",   get: r => t(r.capacity), n: true },
+    { h: "Used",       get: r => chip(r.band.severity) },
+  ], D.planVsActual);
+
+  // ── remelt ──────────────────────────────────────────────────────────
+  const avail = b => b.weightQuantity - b.reservedWeightQuantity;
+  const raw = D.balances.filter(b => b.productCode === "RAW-SUGAR");
+  const remeltCols = [
+    { h: "Warehouse", get: r => r.storageCode, strong: true },
+    { h: "Product",   get: r => r.productName },
+    { h: "Packaging", get: r => r.packagingCode },
+    { h: "Batch",     get: r => r.batchNo || "—" },
+    { h: "On hand",   get: r => t(r.weightQuantity), n: true },
+    { h: "Reserved",  get: r => t(r.reservedWeightQuantity), n: true },
+    { h: "Available", get: r => t(avail(r)), n: true },
+  ];
+  table(document.getElementById("remeltTable"), remeltCols, raw);
+  table(document.getElementById("stockTable"), remeltCols.concat([
+    { h: "Packages", get: r => pkg(r.packageQuantity), n: true },
+  ]), D.balances);
+
+  // ── master data ─────────────────────────────────────────────────────
+  table(document.getElementById("locTable"), [
+    { h: "Code",     get: r => r.storageCode, strong: true },
+    { h: "Name",     get: r => r.storageName },
+    { h: "Type",     get: r => r.storageTypeName },
+    { h: "Capacity", get: r => t(r.physicalCapacity), n: true },
+    { h: "Safe",     get: r => pct(r.safeCapacityPercentage), n: true },
+    { h: "Status",   get: r => r.status },
+    { h: "Note",     get: r => r.remark },
+  ], D.locations);
+
+  table(document.getElementById("pkgTable"), [
+    { h: "Code",        get: r => r.code, strong: true },
+    { h: "Description", get: r => r.description },
+    { h: "Net weight",  get: r => r.isBulk ? "—" : grp(r.netWeight, 0) + " " + r.netWeightUom, n: true },
+    { h: "Per package", get: r => r.isBulk ? "—" : grp(r.weightInTon, 3) + " t", n: true },
+    { h: "Bulk",        get: r => r.isBulk ? "Yes" : "No" },
+  ], D.packaging);
+
+  table(document.getElementById("bandTable"), [
+    { h: "Band", get: r => r.code, strong: true },
+    { h: "Name", get: r => r.name },
+    { h: "From", get: r => pct(r.fromPercentage), n: true },
+    { h: "To",   get: r => r.toPercentage == null ? "and above" : pct(r.toPercentage), n: true },
+    { h: "Severity", get: r => chip(r.severity) },
+  ], D.thresholds);
+})();
+</script>
