@@ -237,6 +237,58 @@ type InventoryMovement struct {
 	CapacityOverrideReason string     `json:"capacityOverrideReason,omitempty"`
 }
 
+// User is an application account (see migration 0007).
+//
+// The password digest is deliberately absent: it is read by the login path
+// alone, and a struct that never carries it cannot leak it through a JSON
+// response.
+type User struct {
+	ID          int64    `json:"id"`
+	Username    string   `json:"username"`
+	DisplayName string   `json:"displayName"`
+	Email       string   `json:"email"`
+	Roles       []string `json:"roles"`
+	Status      string   `json:"status"`
+	// MustChangePassword is set when an administrator issued the password.
+	MustChangePassword bool `json:"mustChangePassword"`
+	// CanSignIn reports whether the account has a password at all. An account
+	// without one still owns its history; it simply cannot log in.
+	CanSignIn bool `json:"canSignIn"`
+	// IsDemo marks an account whose password is published in the project
+	// documentation. It exists so the system can say so out loud.
+	IsDemo            bool       `json:"isDemo"`
+	FailedAttempts    int        `json:"failedAttempts"`
+	LockedUntil       *time.Time `json:"lockedUntil,omitempty"`
+	LastLoginAt       *time.Time `json:"lastLoginAt,omitempty"`
+	PasswordChangedAt *time.Time `json:"passwordChangedAt,omitempty"`
+	Remark            string     `json:"remark"`
+	CreatedAt         time.Time  `json:"createdAt"`
+	// Version supports optimistic locking on update.
+	Version int `json:"version"`
+}
+
+// Locked reports whether sign-in is being throttled at the given time.
+func (u User) Locked(now time.Time) bool {
+	return u.LockedUntil != nil && u.LockedUntil.After(now)
+}
+
+// UserSession is one signed-in browser or API client.
+//
+// The token itself is not here for the same reason the password digest is not
+// on User: only its hash is stored, and nothing outside the login path needs
+// even that.
+type UserSession struct {
+	ID         int64      `json:"id"`
+	UserID     int64      `json:"userId"`
+	Username   string     `json:"username,omitempty"`
+	IssuedAt   time.Time  `json:"issuedAt"`
+	ExpiresAt  time.Time  `json:"expiresAt"`
+	LastSeenAt time.Time  `json:"lastSeenAt"`
+	RevokedAt  *time.Time `json:"revokedAt,omitempty"`
+	UserAgent  string     `json:"userAgent,omitempty"`
+	ClientIP   string     `json:"clientIp,omitempty"`
+}
+
 // Season is a crushing campaign.
 type Season struct {
 	ID            int64     `json:"id"`

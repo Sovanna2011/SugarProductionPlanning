@@ -39,7 +39,8 @@ COPY backend/ ./
 ENV CGO_ENABLED=0
 RUN go build -trimpath -ldflags="-s -w" -o /out/spp-server ./cmd/server \
  && go build -trimpath -ldflags="-s -w" -o /out/spp-migrate ./cmd/migrate \
- && go build -trimpath -ldflags="-s -w" -o /out/spp-seed-demo ./cmd/seed-demo
+ && go build -trimpath -ldflags="-s -w" -o /out/spp-seed-demo ./cmd/seed-demo \
+ && go build -trimpath -ldflags="-s -w" -o /out/spp-seed-users ./cmd/seed-users
 
 # ---------------------------------------------------------------------------
 # 3. Runtime
@@ -51,7 +52,7 @@ RUN apk add --no-cache ca-certificates tzdata \
  && adduser -D -u 10001 spp
 
 WORKDIR /app
-COPY --from=backend /out/spp-server /out/spp-migrate /out/spp-seed-demo /usr/local/bin/
+COPY --from=backend /out/spp-server /out/spp-migrate /out/spp-seed-demo /out/spp-seed-users /usr/local/bin/
 COPY --from=webapp  /src/dist /app/web
 
 ENV SPP_ADDR=:8080 \

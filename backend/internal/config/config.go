@@ -46,14 +46,27 @@ func Load() (Config, error) {
 			UserHeader:  env("SPP_AUTH_USER_HEADER", "X-Forwarded-User"),
 			NameHeader:  env("SPP_AUTH_NAME_HEADER", "X-Forwarded-Name"),
 			RolesHeader: env("SPP_AUTH_ROLES_HEADER", "X-Forwarded-Groups"),
+			CookieName:  env("SPP_SESSION_COOKIE", "spp_session"),
+			// Off by default because the evaluation deployment is plain HTTP,
+			// and a Secure cookie there is silently discarded by the browser,
+			// which looks exactly like a broken login. Turn it on — it must be
+			// on — wherever the site is served over HTTPS.
+			CookieSecure: env("SPP_SESSION_COOKIE_SECURE", "false") == "true",
 		},
 	}
 
 	mode, ok := auth.ParseMode(env("SPP_AUTH_MODE", string(auth.ModeNone)))
 	if !ok {
-		return c, fmt.Errorf("SPP_AUTH_MODE must be none or proxy, got %q", os.Getenv("SPP_AUTH_MODE"))
+		return c, fmt.Errorf("SPP_AUTH_MODE must be none, local or proxy, got %q", os.Getenv("SPP_AUTH_MODE"))
 	}
 	c.Auth.Mode = mode
+
+	ttl, err := time.ParseDuration(env("SPP_SESSION_TTL", "12h"))
+	if err != nil || ttl <= 0 {
+		return c, fmt.Errorf("SPP_SESSION_TTL must be a positive duration such as 12h, got %q",
+			os.Getenv("SPP_SESSION_TTL"))
+	}
+	c.Auth.SessionTTL = ttl
 
 	if strings.TrimSpace(c.DatabaseURL) == "" {
 		return c, fmt.Errorf("SPP_DATABASE_URL is required, for example postgres://user:pass@localhost:5432/spp")

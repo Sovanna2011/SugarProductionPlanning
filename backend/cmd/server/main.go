@@ -57,22 +57,51 @@ func run() error {
 		log.Info("migrations up to date", "count", len(files))
 	}
 
-	// A deployment that has not chosen an authentication mechanism is only
-	// safe on a trusted network, and should be told so on every start.
-	if cfg.Auth.Mode == auth.ModeNone {
-		log.Warn("authentication is disabled: every endpoint is open and the audit trail " +
-			"records whatever the caller declares. Safe only on a trusted network. " +
-			"See docs/security.md")
-	} else {
-		log.Info("authentication enabled", "mode", cfg.Auth.Mode, "userHeader", cfg.Auth.UserHeader)
-	}
-
-	svc := service.New(store, service.WithOverrideRole(cfg.OverrideRole))
+	svc := service.New(store,
+		service.WithOverrideRole(cfg.OverrideRole),
+		service.WithSessionTTL(cfg.Auth.SessionTTL))
 	if cfg.OverrideRole != "" {
 		log.Info("capacity overrides restricted", "role", cfg.OverrideRole)
 	}
 
-	api := httpapi.New(svc, log, cfg.WebDir, cfg.Auth)
+	// A deployment that has not chosen an authentication mechanism is only
+	// safe on a trusted network, and should be told so on every start.
+	switch cfg.Auth.Mode {
+	case auth.ModeNone:
+		log.Warn("authentication is disabled: every endpoint is open and the audit trail " +
+			"records whatever the caller declares. Safe only on a trusted network. " +
+			"See docs/security.md")
+
+	case auth.ModeLocal:
+		// The service resolves session tokens, so the middleware can stay
+		// free of the database.
+		cfg.Auth.Sessions = svc
+
+		n, demo, err := store.CountUsers(ctx)
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			log.Warn("sign-in is required but no accounts exist, so nobody can sign in. " +
+				"Create one with: spp-seed-users -admin <name>")
+		}
+		if demo > 0 {
+			log.Warn("this database holds demo accounts whose passwords are published in the "+
+				"project documentation. Deactivate them before the system holds anything real: "+
+				"spp-seed-users -remove-demo", "accounts", demo)
+		}
+		log.Info("authentication enabled", "mode", cfg.Auth.Mode,
+			"users", n, "sessionTtl", cfg.Auth.SessionTTL, "secureCookie", cfg.Auth.CookieSecure)
+		if !cfg.Auth.CookieSecure {
+			log.Warn("the session cookie is not marked Secure, so a browser will send it over " +
+				"plain HTTP. Set SPP_SESSION_COOKIE_SECURE=true wherever this is served over HTTPS")
+		}
+
+	default:
+		log.Info("authentication enabled", "mode", cfg.Auth.Mode, "userHeader", cfg.Auth.UserHeader)
+	}
+
+	api := httpapi.New(svc, log, cfg.WebDir, cfg.Auth, cfg.OverrideRole)
 	srv := &http.Server{
 		Addr:              cfg.Addr,
 		Handler:           api.Routes(),

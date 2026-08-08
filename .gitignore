@@ -18,3 +18,5 @@ npm-debug.log*
 .idea/
 .vscode/
 *.swp
+/backend/seed-demo
+/backend/spp-seed-users

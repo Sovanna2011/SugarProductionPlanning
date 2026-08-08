@@ -22,12 +22,16 @@ type API struct {
 	log    *slog.Logger
 	webDir string
 	auth   auth.Config
+	// overrideRole mirrors the service's setting so the API can tell a client
+	// up front whether it may force a blocked posting, rather than letting it
+	// find out from a 403 halfway through one.
+	overrideRole string
 }
 
 // New builds the API. webDir, when set, is served at / so the UI5 dashboard and
 // the backend can run from one process in development.
-func New(svc *service.Service, log *slog.Logger, webDir string, authCfg auth.Config) *API {
-	return &API{svc: svc, log: log, webDir: webDir, auth: authCfg}
+func New(svc *service.Service, log *slog.Logger, webDir string, authCfg auth.Config, overrideRole string) *API {
+	return &API{svc: svc, log: log, webDir: webDir, auth: authCfg, overrideRole: overrideRole}
 }
 
 // Routes returns the configured mux.
@@ -35,6 +39,20 @@ func (a *API) Routes() http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/v1/health", a.health)
+
+	// Signing in. auth/config and auth/login are reachable without a session,
+	// because a browser has to ask both before anyone has one.
+	mux.HandleFunc("GET /api/v1/auth/config", a.authConfigHandler)
+	mux.HandleFunc("POST /api/v1/auth/login", a.login)
+	mux.HandleFunc("POST /api/v1/auth/logout", a.logout)
+	mux.HandleFunc("GET /api/v1/auth/me", a.me)
+	mux.HandleFunc("POST /api/v1/auth/change-password", a.changePassword)
+
+	// User administration.
+	mux.HandleFunc("GET /api/v1/admin/users", a.users)
+	mux.HandleFunc("POST /api/v1/admin/users", a.saveUser)
+	mux.HandleFunc("POST /api/v1/admin/users/reset-password", a.resetPassword)
+	mux.HandleFunc("POST /api/v1/admin/users/sign-out", a.signOutUser)
 
 	// Master data.
 	mux.HandleFunc("GET /api/v1/factories", a.factories)
@@ -78,8 +96,9 @@ func (a *API) Routes() http.Handler {
 	}
 
 	// Identity is established before anything else, so every handler and
-	// service below reads the actor from the request context.
-	return a.recoverPanic(cors(auth.Middleware(a.auth, a.log)(mux)))
+	// service below reads the actor from the request context; the guard then
+	// decides whether this caller may reach the route at all.
+	return a.recoverPanic(cors(auth.Middleware(a.auth, a.log)(a.guard(mux))))
 }
 
 // --- helpers ---------------------------------------------------------------
