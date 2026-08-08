@@ -19,6 +19,16 @@
 		<headerContent>
 			<Text text="{app>/dashboard/factoryName}" class="sppHeaderText"/>
 			<Button
+				icon="sap-icon://compare"
+				text="{i18n>planVsActualTitle}"
+				tooltip="{i18n>planVsActualTooltip}"
+				press=".onOpenPlanVsActual"/>
+			<Button
+				icon="sap-icon://cause"
+				text="{i18n>remeltTitle}"
+				tooltip="{i18n>remeltTooltip}"
+				press=".onOpenRemelt"/>
+			<Button
 				icon="sap-icon://settings"
 				text="{i18n>masterDataTitle}"
 				tooltip="{i18n>masterDataTooltip}"

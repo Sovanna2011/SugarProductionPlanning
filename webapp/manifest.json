@@ -85,6 +85,16 @@
 					"pattern": "master-data",
 					"name": "masterData",
 					"target": "masterData"
+				},
+				{
+					"pattern": "plan-vs-actual",
+					"name": "planVsActual",
+					"target": "planVsActual"
+				},
+				{
+					"pattern": "remelt",
+					"name": "remelt",
+					"target": "remelt"
 				}
 			],
 			"targets": {
@@ -96,6 +106,16 @@
 				"masterData": {
 					"id": "masterData",
 					"name": "MasterData",
+					"level": 2
+				},
+				"planVsActual": {
+					"id": "planVsActual",
+					"name": "PlanVsActual",
+					"level": 2
+				},
+				"remelt": {
+					"id": "remelt",
+					"name": "Remelt",
 					"level": 2
 				}
 			}

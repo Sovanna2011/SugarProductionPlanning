@@ -1,0 +1,163 @@
+<mvc:View
+	controllerName="kss.spp.controller.Remelt"
+	xmlns="sap.m"
+	xmlns:mvc="sap.ui.core.mvc"
+	xmlns:core="sap.ui.core"
+	displayBlock="true"
+	height="100%">
+
+	<Page
+		id="remeltPage"
+		title="{i18n>remeltTitle}"
+		showNavButton="true"
+		navButtonPress=".onNavBack"
+		busy="{app>/busy}"
+		busyIndicatorDelay="0">
+
+		<headerContent>
+			<Button icon="sap-icon://refresh" tooltip="{i18n>refresh}" press=".onRefresh"/>
+		</headerContent>
+
+		<content>
+			<!-- The flow the requirement sketches: pick a warehouse, pick a
+			     batch, check what is available, issue it. -->
+			<MessageStrip
+				class="sapUiSmallMargin"
+				type="Information"
+				showIcon="true"
+				text="{i18n>remeltHint}"/>
+
+			<Panel headerText="{i18n>step1SelectWarehouse}" class="sppPanel">
+				<Toolbar>
+					<Label text="{i18n>sourceWarehouse}" labelFor="remeltWarehouse"/>
+					<Select
+						id="remeltWarehouse"
+						width="24rem"
+						selectedKey="{app>/remelt/storageCode}"
+						change=".onWarehouseChange"
+						items="{
+							path: 'app>/remelt/warehouses',
+							templateShareable: false
+						}">
+						<core:Item key="{app>storageCode}" text="{app>storageCode} — {app>storageName}"/>
+					</Select>
+					<ToolbarSpacer/>
+					<ObjectStatus
+						title="{i18n>totalAvailable}"
+						text="{
+							parts: ['app>/remelt/totalAvailable'],
+							formatter: '.formatter.tons'
+						}"
+						state="Information"/>
+				</Toolbar>
+			</Panel>
+
+			<Panel headerText="{i18n>step2SelectBatch}" class="sppPanel">
+				<Table
+					id="remeltStockTable"
+					mode="SingleSelectLeft"
+					includeItemInSelection="true"
+					selectionChange=".onStockSelect"
+					items="{
+						path: 'app>/remelt/stock',
+						templateShareable: false
+					}"
+					noDataText="{i18n>noRawSugarStock}"
+					fixedLayout="false">
+
+					<columns>
+						<Column><Text text="{i18n>product}"/></Column>
+						<Column><Text text="{i18n>packaging}"/></Column>
+						<Column><Text text="{i18n>batch}"/></Column>
+						<Column hAlign="End"><Text text="{i18n>onHand}"/></Column>
+						<Column hAlign="End"><Text text="{i18n>reserved}"/></Column>
+						<Column hAlign="End"><Text text="{i18n>available}"/></Column>
+					</columns>
+
+					<items>
+						<ColumnListItem>
+							<cells>
+								<Text text="{app>productName}"/>
+								<Text text="{app>packagingCode}"/>
+								<Text text="{= ${app>batchNo} || '—' }"/>
+								<Text text="{path: 'app>weightQuantity', formatter: '.formatter.tons'}"/>
+								<Text text="{path: 'app>reservedWeightQuantity', formatter: '.formatter.tons'}"/>
+								<ObjectNumber
+									number="{
+										path: 'app>availableWeight',
+										formatter: '.formatter.tons'
+									}"
+									state="{= ${app>availableWeight} > 0 ? 'Success' : 'Error' }"/>
+							</cells>
+						</ColumnListItem>
+					</items>
+				</Table>
+			</Panel>
+
+			<Panel headerText="{i18n>step3Issue}" class="sppPanel"
+				visible="{= !!${app>/remelt/selected} }">
+
+				<VBox class="sapUiSmallMargin">
+					<HBox alignItems="End" wrap="Wrap" class="sppFigures">
+						<VBox class="sapUiSmallMarginEnd">
+							<Label text="{i18n>selectedStock}"/>
+							<Text text="{app>/remelt/selected/productName} · {app>/remelt/selected/packagingCode} · {= ${app>/remelt/selected/batchNo} || '—' }"/>
+						</VBox>
+						<VBox class="sapUiSmallMarginEnd">
+							<Label text="{i18n>available}"/>
+							<Text text="{
+								path: 'app>/remelt/selected/availableWeight',
+								formatter: '.formatter.tons'
+							}"/>
+						</VBox>
+						<VBox class="sapUiSmallMarginEnd">
+							<Label text="{i18n>issueQuantity}" required="true"/>
+							<Input
+								id="remeltQty"
+								width="12rem"
+								type="Number"
+								value="{app>/remelt/quantity}"
+								description="TON"/>
+						</VBox>
+						<VBox class="sapUiSmallMarginEnd">
+							<Label text="{i18n>referenceDoc}"/>
+							<Input width="14rem" value="{app>/remelt/reference}" placeholder="RM-2027-001"/>
+						</VBox>
+						<Button
+							text="{i18n>issueToRemelt}"
+							type="Emphasized"
+							icon="sap-icon://cause"
+							press=".onIssue"/>
+					</HBox>
+
+					<MessageStrip
+						class="sapUiSmallMarginTop"
+						type="Warning"
+						showIcon="true"
+						visible="{= Number(${app>/remelt/quantity}) > Number(${app>/remelt/selected/availableWeight}) }"
+						text="{i18n>overAvailableHint}"/>
+				</VBox>
+			</Panel>
+
+			<Panel headerText="{i18n>recentIssues}" class="sppPanel"
+				visible="{= ${app>/remelt/history}.length > 0 }">
+				<List
+					items="{
+						path: 'app>/remelt/history',
+						templateShareable: false
+					}"
+					showSeparators="Inner">
+					<StandardListItem
+						title="{app>storageCode} · {app>productCode}"
+						description="{
+							parts: ['app>movementDate', 'app>referenceDoc', 'app>batchNo'],
+							formatter: '.formatter.movementSubtitle'
+						}"
+						info="{path: 'app>weightQuantity', formatter: '.formatter.signedTons'}"
+						infoState="Information"
+						icon="sap-icon://cause"/>
+				</List>
+			</Panel>
+		</content>
+	</Page>
+</mvc:View>

@@ -56,7 +56,7 @@ backend/
     ├── service/         Dashboard, projection, plan vs actual, posting, master data
     ├── httpapi/         Routing and JSON
     └── config/          Environment configuration
-webapp/                  SAP UI5 app: dashboard + master data maintenance
+webapp/                  SAP UI5 app: dashboard, master data, plan vs actual, remelt
 scripts/                 Workbook extraction
 docs/                    Data model, plan analysis, source documents
 ```

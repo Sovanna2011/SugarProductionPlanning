@@ -14,7 +14,7 @@ to where it is implemented.
 | 6 | Product + packaging combination | `product_packaging`; inventory keyed by product + packaging + batch + location |
 | 7 | Molasses tank capacity | Tank rows + `capacity.Utilize`; available and utilisation formulas covered by `TestUtilizeMatchesTheTankExample` |
 | 8 | Raw sugar warehouse capacity | `RAW-WH01/02` with bulk and jumbo capacity rows |
-| 9 | Raw sugar → remelt availability | `inventory_available` view, `GET /inventory/balances`; `POST /inventory/reservations` commits stock and bounds what is available; issue blocked when stock is short |
+| 9 | Raw sugar → remelt availability | Guided **Issue to Remelt** screen: select warehouse → select batch → check available → issue. `POST /inventory/reservations` commits stock and bounds what is available; issue blocked when stock is short |
 | 10 | Conditioning Silo 1 | `CON-S01`, storage type `tracks_packages = false`, weight-managed |
 | 11 | Finished sugar warehouses | `FG-WH01/02/03`; new products need only a new capacity row |
 | 12 | Finished warehouse product capacity | Seeded capacity matrix, all values maintainable through the API |
@@ -22,7 +22,7 @@ to where it is implemented.
 | 14 | Package/weight conversion | `capacity.WeightOf` / `PackagesOf`; the API derives whichever axis the caller omits |
 | 15 | Daily warehouse planning | `daily_storage_plans`; `GET`/`POST /planning/storage`. Closing stock is derived, and an omitted opening carries the previous day's closing forward |
 | 16 | Daily warehouse actual | Balances only change via posted movements, in the same transaction. No API writes a closing stock |
-| 17 | Plan vs actual | `GET /planning/plan-vs-actual` — opening, planned/actual in and out, closing, variance, capacity, available, utilisation |
+| 17 | Plan vs actual | **Plan vs Actual** screen over `GET /planning/plan-vs-actual` — opening, planned/actual in and out, closing, variance, capacity, available, utilisation |
 | 18 | Capacity alerts | `capacity_threshold_levels` + `capacity.Classify`; `GET /alerts`. Bands are replaced as a validated contiguous set via `PUT /master/threshold-levels` |
 | 19 | Future capacity planning | `GET /planning/projection` — daily curve, first safe and physical breach dates, horizons today/+1/+3/+7/end of month/end of season |
 | 20 | Warehouse dashboard | `webapp/` UI5 app — all six filters, pooled cards, per-location utilisation bars, product tables, alerts |

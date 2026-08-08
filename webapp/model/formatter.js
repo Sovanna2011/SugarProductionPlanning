@@ -84,6 +84,45 @@ sap.ui.define([], function () {
 		},
 
 		/**
+		 * The subtitle of a movement in a list: date, then whichever of the
+		 * reference and batch are actually set, so a blank one never leaves a
+		 * dangling separator.
+		 */
+		movementSubtitle: function (date, reference, batch) {
+			var parts = [formatter.shortDate(date)];
+			if (batch) {
+				parts.push("Batch " + batch);
+			}
+			if (reference) {
+				parts.push(reference);
+			}
+			return parts.join(" · ");
+		},
+
+		/**
+		 * A signed weight, so a variance reads as +120 t or -80 t rather than
+		 * needing a separate direction column.
+		 */
+		signedTons: function (value) {
+			if (!isNumber(value)) {
+				return "—";
+			}
+			var sign = value > 0 ? "+" : "";
+			return sign + group(value, value % 1 === 0 ? 0 : 3) + " t";
+		},
+
+		/**
+		 * Colours a plan variance. Holding more than planned is the direction
+		 * that fills a warehouse, so it reads as the warning.
+		 */
+		varianceState: function (value) {
+			if (!isNumber(value) || Math.abs(value) < 0.001) {
+				return "None";
+			}
+			return value > 0 ? "Warning" : "Information";
+		},
+
+		/**
 		 * The per-package conversion factor, shown with enough precision to
 		 * distinguish 0.025 from 0.050.
 		 */

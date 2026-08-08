@@ -1,0 +1,100 @@
+<mvc:View
+	controllerName="kss.spp.controller.PlanVsActual"
+	xmlns="sap.m"
+	xmlns:mvc="sap.ui.core.mvc"
+	displayBlock="true"
+	height="100%">
+
+	<Page
+		id="planVsActualPage"
+		title="{i18n>planVsActualTitle}"
+		showNavButton="true"
+		navButtonPress=".onNavBack"
+		busy="{app>/busy}"
+		busyIndicatorDelay="0">
+
+		<headerContent>
+			<Button icon="sap-icon://refresh" tooltip="{i18n>refresh}" press=".onRefresh"/>
+		</headerContent>
+
+		<content>
+			<Toolbar class="sapUiSmallMarginBegin sapUiSmallMarginTop">
+				<Label text="{i18n>date}" labelFor="pvaDate"/>
+				<DatePicker
+					id="pvaDate"
+					width="12rem"
+					valueFormat="yyyy-MM-dd"
+					displayFormat="dd MMM yyyy"
+					value="{app>/planVsActual/date}"
+					change=".onDateChange"/>
+				<ToolbarSpacer/>
+				<Text text="{i18n>plannedVsActualHint}" class="sppMuted"/>
+			</Toolbar>
+
+			<MessageStrip
+				class="sapUiSmallMargin"
+				type="Information"
+				showIcon="true"
+				visible="{= ${app>/planVsActual/rows}.length === 0 }"
+				text="{i18n>noPlanForDate}"/>
+
+			<ScrollContainer
+				horizontal="true"
+				vertical="false"
+				width="100%"
+				class="sapUiSmallMarginBottom"
+				visible="{= ${app>/planVsActual/rows}.length > 0 }">
+			<Table
+				id="pvaTable"
+				items="{
+					path: 'app>/planVsActual/rows',
+					templateShareable: false
+				}"
+				fixedLayout="false"
+				class="sapUiSmallMargin"
+				visible="{= ${app>/planVsActual/rows}.length > 0 }">
+
+				<columns>
+					<Column><Text text="{i18n>storage}"/></Column>
+					<Column hAlign="End"><Text text="{i18n>opening}"/></Column>
+					<Column hAlign="End"><Text text="{i18n>plannedIn}"/></Column>
+					<Column hAlign="End"><Text text="{i18n>actualIn}"/></Column>
+					<Column hAlign="End"><Text text="{i18n>plannedOut}"/></Column>
+					<Column hAlign="End"><Text text="{i18n>actualOut}"/></Column>
+					<Column hAlign="End"><Text text="{i18n>plannedClosing}"/></Column>
+					<Column hAlign="End"><Text text="{i18n>actualClosing}"/></Column>
+					<Column hAlign="End"><Text text="{i18n>variance}"/></Column>
+					<Column hAlign="End"><Text text="{i18n>capacity}"/></Column>
+					<Column hAlign="End"><Text text="{i18n>available}"/></Column>
+					<Column hAlign="End"><Text text="{i18n>utilization}"/></Column>
+				</columns>
+
+				<items>
+					<ColumnListItem>
+						<cells>
+							<ObjectIdentifier title="{app>scopeCode}" text="{app>scopeName}"/>
+							<Text text="{path: 'app>opening', formatter: '.formatter.tons'}"/>
+							<Text text="{path: 'app>plannedIn', formatter: '.formatter.tons'}"/>
+							<Text text="{path: 'app>actualIn', formatter: '.formatter.tons'}"/>
+							<Text text="{path: 'app>plannedOut', formatter: '.formatter.tons'}"/>
+							<Text text="{path: 'app>actualOut', formatter: '.formatter.tons'}"/>
+							<Text text="{path: 'app>plannedClosing', formatter: '.formatter.tons'}"/>
+							<Text text="{path: 'app>actualClosing', formatter: '.formatter.tons'}"/>
+							<!-- Signed, and coloured by direction: behind plan reads
+							     differently from ahead of it. -->
+							<ObjectNumber
+								number="{path: 'app>variance', formatter: '.formatter.signedTons'}"
+								state="{path: 'app>variance', formatter: '.formatter.varianceState'}"/>
+							<Text text="{path: 'app>capacity', formatter: '.formatter.tons'}"/>
+							<Text text="{path: 'app>availableCapacity', formatter: '.formatter.tons'}"/>
+							<ObjectStatus
+								text="{path: 'app>utilizationPercentage', formatter: '.formatter.percent'}"
+								state="{app>band/uiState}"/>
+						</cells>
+					</ColumnListItem>
+				</items>
+			</Table>
+			</ScrollContainer>
+		</content>
+	</Page>
+</mvc:View>

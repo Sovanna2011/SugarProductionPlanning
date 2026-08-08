@@ -22,6 +22,16 @@ sap.ui.define([
 			this.getRouter().navTo("masterData");
 		},
 
+		/** Opens the daily plan versus actual comparison. */
+		onOpenPlanVsActual: function () {
+			this.getRouter().navTo("planVsActual");
+		},
+
+		/** Opens the raw sugar to remelt issue flow. */
+		onOpenRemelt: function () {
+			this.getRouter().navTo("remelt");
+		},
+
 		// --- data loading ----------------------------------------------------
 
 		_loadMasterData: function () {
