@@ -56,11 +56,15 @@ sap.ui.define([
 				that._model.setProperty("/master/capacities", a[1]);
 				that._model.setProperty("/master/packagingTypes", a[2]);
 				that._model.setProperty("/master/thresholds", a[3]);
-				// The dialogs pick from these; refresh them here so the
-				// screen works even when opened directly by URL.
-				that._model.setProperty("/storageTypes", a[4]);
-				that._model.setProperty("/products", a[5]);
-				that._model.setProperty("/packagingTypes", a[2]);
+				// Kept under /master, deliberately separate from the
+				// dashboard's filter lists. Those carry a leading "(All)"
+				// entry, and overwriting them here would leave the dashboard's
+				// Select unable to match its empty selectedKey — it would then
+				// auto-select the first item and silently apply a filter the
+				// user never chose.
+				that._model.setProperty("/master/storageTypes", a[4]);
+				that._model.setProperty("/master/products", a[5]);
+				that._model.setProperty("/master/packagingTypes", a[2]);
 			}).catch(function (err) {
 				that.showError(err);
 			}).finally(function () {
@@ -207,8 +211,8 @@ sap.ui.define([
 
 		onNewCapacity: function () {
 			var aLocations = this._model.getProperty("/master/storageLocations") || [];
-			var aProducts = this._model.getProperty("/products") || [];
-			var aPackaging = this._model.getProperty("/packagingTypes") || [];
+			var aProducts = this._model.getProperty("/master/products") || [];
+			var aPackaging = this._model.getProperty("/master/packagingTypes") || [];
 
 			this._openDialog("CapacityDialog", {
 				title: this.getText("newCapacity"),

@@ -252,7 +252,7 @@ func (a *API) movements(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) postMovement(w http.ResponseWriter, r *http.Request) {
 	a.handle(w, r, func() (any, error) {
-		req, err := decodeMovement(r)
+		req, err := decodeMovement(w, r)
 		if err != nil {
 			return nil, err
 		}
@@ -262,7 +262,7 @@ func (a *API) postMovement(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) validateMovement(w http.ResponseWriter, r *http.Request) {
 	a.handle(w, r, func() (any, error) {
-		req, err := decodeMovement(r)
+		req, err := decodeMovement(w, r)
 		if err != nil {
 			return nil, err
 		}
@@ -270,15 +270,22 @@ func (a *API) validateMovement(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func decodeMovement(r *http.Request) (service.MovementRequest, error) {
-	return decodeBody[service.MovementRequest](r)
+// maxBodyBytes caps a request body. The planning endpoints accept arrays of
+// plan lines, so the limit is generous but not unbounded.
+const maxBodyBytes = 4 << 20
+
+func decodeMovement(w http.ResponseWriter, r *http.Request) (service.MovementRequest, error) {
+	return decodeBody[service.MovementRequest](w, r)
 }
 
 // decodeBody reads a JSON request body, rejecting unknown fields so a
 // misspelled key is reported rather than silently ignored.
-func decodeBody[T any](r *http.Request) (T, error) {
+//
+// The ResponseWriter is handed to MaxBytesReader so an oversized body closes
+// the connection properly instead of being read to exhaustion.
+func decodeBody[T any](w http.ResponseWriter, r *http.Request) (T, error) {
 	var body T
-	dec := json.NewDecoder(http.MaxBytesReader(nil, r.Body, 4<<20))
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&body); err != nil {
 		return body, errors.Join(service.ErrValidation, err)
@@ -290,7 +297,7 @@ func decodeBody[T any](r *http.Request) (T, error) {
 
 func (a *API) saveStorageLocation(w http.ResponseWriter, r *http.Request) {
 	a.handle(w, r, func() (any, error) {
-		in, err := decodeBody[service.StorageLocationInput](r)
+		in, err := decodeBody[service.StorageLocationInput](w, r)
 		if err != nil {
 			return nil, err
 		}
@@ -300,7 +307,7 @@ func (a *API) saveStorageLocation(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) saveStorageCapacity(w http.ResponseWriter, r *http.Request) {
 	a.handle(w, r, func() (any, error) {
-		in, err := decodeBody[service.StorageProductCapacityInput](r)
+		in, err := decodeBody[service.StorageProductCapacityInput](w, r)
 		if err != nil {
 			return nil, err
 		}
@@ -310,7 +317,7 @@ func (a *API) saveStorageCapacity(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) savePackagingType(w http.ResponseWriter, r *http.Request) {
 	a.handle(w, r, func() (any, error) {
-		in, err := decodeBody[service.PackagingTypeInput](r)
+		in, err := decodeBody[service.PackagingTypeInput](w, r)
 		if err != nil {
 			return nil, err
 		}
@@ -320,7 +327,7 @@ func (a *API) savePackagingType(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) replaceThresholds(w http.ResponseWriter, r *http.Request) {
 	a.handle(w, r, func() (any, error) {
-		in, err := decodeBody[service.ThresholdBandsInput](r)
+		in, err := decodeBody[service.ThresholdBandsInput](w, r)
 		if err != nil {
 			return nil, err
 		}
@@ -332,7 +339,7 @@ func (a *API) replaceThresholds(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) reserve(w http.ResponseWriter, r *http.Request) {
 	a.handle(w, r, func() (any, error) {
-		in, err := decodeBody[service.ReservationRequest](r)
+		in, err := decodeBody[service.ReservationRequest](w, r)
 		if err != nil {
 			return nil, err
 		}
@@ -342,7 +349,7 @@ func (a *API) reserve(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) release(w http.ResponseWriter, r *http.Request) {
 	a.handle(w, r, func() (any, error) {
-		in, err := decodeBody[service.ReservationRequest](r)
+		in, err := decodeBody[service.ReservationRequest](w, r)
 		if err != nil {
 			return nil, err
 		}
@@ -355,7 +362,7 @@ func (a *API) release(w http.ResponseWriter, r *http.Request) {
 // saveStoragePlan accepts either a single plan line or an array of them.
 func (a *API) saveStoragePlan(w http.ResponseWriter, r *http.Request) {
 	a.handle(w, r, func() (any, error) {
-		raw, err := io.ReadAll(http.MaxBytesReader(nil, r.Body, 4<<20))
+		raw, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBodyBytes))
 		if err != nil {
 			return nil, errors.Join(service.ErrValidation, err)
 		}

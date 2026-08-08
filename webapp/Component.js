@@ -49,7 +49,9 @@ sap.ui.define([
 					storageLocations: [],
 					capacities: [],
 					packagingTypes: [],
-					thresholds: []
+					thresholds: [],
+					storageTypes: [],
+					products: []
 				}
 			}), "app");
 

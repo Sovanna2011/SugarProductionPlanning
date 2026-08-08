@@ -33,7 +33,7 @@
 						selectedKey="{edit>/storageTypeCode}"
 						width="100%"
 						items="{
-							path: 'app>/storageTypes',
+							path: 'app>/master/storageTypes',
 							templateShareable: false
 						}">
 						<core:Item key="{app>code}" text="{app>name}"/>

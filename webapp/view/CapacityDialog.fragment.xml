@@ -36,7 +36,7 @@
 						enabled="{= !${edit>/isUpdate} }"
 						width="100%"
 						items="{
-							path: 'app>/products',
+							path: 'app>/master/products',
 							templateShareable: false
 						}">
 						<core:Item key="{app>code}" text="{app>name}"/>
@@ -48,7 +48,7 @@
 						enabled="{= !${edit>/isUpdate} }"
 						width="100%"
 						items="{
-							path: 'app>/packagingTypes',
+							path: 'app>/master/packagingTypes',
 							templateShareable: false
 						}">
 						<core:Item key="{app>code}" text="{app>description}"/>
