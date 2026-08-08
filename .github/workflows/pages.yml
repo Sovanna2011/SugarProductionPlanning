@@ -1,0 +1,69 @@
+# Publishes the demo pages to GitHub Pages, so there is a public address
+# anybody can open — no account, no install, no running server.
+#
+#   https://sovanna2011.github.io/SugarProductionPlanning/
+#
+# What goes there is the reproduction: the clickable sign-in flow and the two
+# pages of captured output. The real system needs a server and a database,
+# which Pages does not provide — see README.md for running that.
+
+name: Demo pages
+
+on:
+  push:
+    branches:
+      - main
+      - claude/sugar-factory-production-planning-4gqhzr
+    paths:
+      - "demo/**"
+      - "scripts/build-pages.sh"
+      - ".github/workflows/pages.yml"
+  # So it can be published on demand, without waiting for demo/ to change.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time. A newer push supersedes a queued one, but never
+# cancels a deployment already in flight.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The build is a script rather than steps here, so it can be run and
+      # checked locally. It rewrites the cross-page links, turns each fragment
+      # into a document, and refuses to produce a page that would not render.
+      - name: Build the site
+        run: ./scripts/build-pages.sh build/pages
+
+      - uses: actions/configure-pages@v5
+        with:
+          # Turns Pages on the first time, so publishing needs no visit to the
+          # repository settings.
+          enablement: true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/pages
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+      - name: Where it went
+        run: |
+          url='${{ steps.deploy.outputs.page_url }}'
+          echo "Front door:      $url"
+          echo "Clickable login: ${url}login.html"

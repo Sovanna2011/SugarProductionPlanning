@@ -20,3 +20,4 @@ npm-debug.log*
 *.swp
 /backend/seed-demo
 /backend/spp-seed-users
+/build/
