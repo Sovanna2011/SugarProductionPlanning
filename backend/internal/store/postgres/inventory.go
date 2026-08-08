@@ -278,6 +278,10 @@ func (s *Store) ListMovements(ctx context.Context, f MovementFilter) ([]domain.I
 	if limit <= 0 || limit > 1000 {
 		limit = 200
 	}
+	// Bound and passed as a parameter rather than concatenated, so this query
+	// needs no reasoning about the value's provenance.
+	w.args = append(w.args, limit)
+	limitPlaceholder := fmt.Sprintf("$%d", len(w.args))
 
 	rows, err := s.pool.Query(ctx, `
 		SELECT m.id, m.factory_id, m.movement_date, m.movement_type_id, mt.code, mt.direction,
@@ -295,7 +299,7 @@ func (s *Store) ListMovements(ctx context.Context, f MovementFilter) ([]domain.I
 		JOIN uoms u ON u.id = m.weight_uom_id
 		WHERE TRUE`+w.where()+`
 		ORDER BY m.movement_date DESC, m.id DESC
-		LIMIT `+fmt.Sprint(limit), w.args...)
+		LIMIT `+limitPlaceholder, w.args...)
 	if err != nil {
 		return nil, err
 	}

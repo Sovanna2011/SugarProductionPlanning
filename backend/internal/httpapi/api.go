@@ -92,8 +92,21 @@ type errorBody struct {
 	Error string `json:"error"`
 }
 
+// fail writes an error response.
+//
+// A 4xx is something the caller can act on — a capacity rule, a bad field, a
+// stale version — so its message is returned verbatim; that is the whole point
+// of the validation findings. A 5xx is not: the underlying error is usually a
+// database failure whose text names tables, columns and constraints, which the
+// caller has no use for and should not be handed. Those are logged in full and
+// answered generically.
 func (a *API) fail(w http.ResponseWriter, r *http.Request, status int, err error) {
-	a.log.Warn("request failed", "path", r.URL.Path, "status", status, "error", err)
+	if status >= http.StatusInternalServerError {
+		a.log.Error("request failed", "path", r.URL.Path, "status", status, "error", err)
+		a.writeJSON(w, status, errorBody{Error: "internal error"})
+		return
+	}
+	a.log.Warn("request rejected", "path", r.URL.Path, "status", status, "error", err)
 	a.writeJSON(w, status, errorBody{Error: err.Error()})
 }
 

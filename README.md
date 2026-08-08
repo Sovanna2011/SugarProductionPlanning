@@ -352,6 +352,11 @@ Capacity figures are marked in each row's `remark`:
   (molasses tanks, the conditioning silo, the product splits). **These need
   confirming with operations.** They are ordinary master data rows.
 
+> **Before deploying this outside a trusted network, read
+> [docs/security.md](docs/security.md).** There is no authentication yet, and
+> the `postedBy` audit field is taken from the request body rather than from an
+> authenticated identity.
+
 See [docs/production-plan-2026-2027.md](docs/production-plan-2026-2027.md) for
 what the plan says and what the system independently reproduces from it, and
 [docs/data-model.md](docs/data-model.md) for the schema.
