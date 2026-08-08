@@ -17,6 +17,7 @@
 //	go run ./cmd/seed-demo                    # 15 Feb 2027 by default
 //	go run ./cmd/seed-demo -date 2027-04-10   # the raw sugar peak
 //	go run ./cmd/seed-demo -force             # add to existing stock
+//	go run ./cmd/seed-demo -if-empty          # a no-op when stock is already there
 package main
 
 import (
@@ -75,6 +76,7 @@ func main() {
 		dsn     = flag.String("database-url", os.Getenv("SPP_DATABASE_URL"), "PostgreSQL connection string")
 		dateStr = flag.String("date", "2027-02-15", "plan date to take the position from (yyyy-mm-dd)")
 		force   = flag.Bool("force", false, "load even when stock already exists")
+		ifEmpty = flag.Bool("if-empty", false, "do nothing, successfully, when stock already exists")
 	)
 	flag.Parse()
 
@@ -109,8 +111,17 @@ func main() {
 	if err != nil {
 		log.Fatalf("read balances: %v", err)
 	}
-	if len(existing) > 0 && !*force {
-		log.Fatalf("this database already holds %d stock lines; pass -force to add anyway", len(existing))
+	if len(existing) > 0 {
+		// -if-empty is for an unattended start, where "the position is already
+		// loaded" is the expected state on every restart after the first, and
+		// exiting non-zero would stop the container.
+		if *ifEmpty {
+			fmt.Printf("%d stock lines already loaded; leaving them alone.\n", len(existing))
+			return
+		}
+		if !*force {
+			log.Fatalf("this database already holds %d stock lines; pass -force to add anyway", len(existing))
+		}
 	}
 
 	svc := service.New(store)

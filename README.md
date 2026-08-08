@@ -63,6 +63,41 @@ docs/                    Data model, plan analysis, source documents
 
 ## Quick start
 
+### The demo system
+
+One command, from nothing to a system you can sign in to and use:
+
+```bash
+docker compose -f docker-compose.demo.yml up --build
+# open http://localhost:8080
+```
+
+That brings up PostgreSQL and the application, applies the migrations, loads
+the 2026/27 season plan, posts the stock position the plan itself predicts for
+15 Feb 2027, and creates five accounts — one per role. Sign in as `admin`,
+`planner`, `warehouse`, `refinery` or `viewer`, all with the password
+`Demo-Sugar-2027`, which the login screen also lists.
+
+Every step is safe to repeat, so restarting the container neither duplicates
+the data nor fails.
+
+On a machine with Go and PostgreSQL but no Docker:
+
+```bash
+./scripts/demo.sh                     # same result
+./scripts/demo.sh --date 2027-04-10   # start from the raw sugar peak instead
+```
+
+[`docs/demo-user-test.md`](docs/demo-user-test.md) is a script for putting it
+in front of the people who would use it: tasks per role, what to watch for, and
+the questions the software cannot answer — starting with whether the
+placeholder tank capacities are right.
+
+**The demo accounts have a password published in this repository.** The server
+says so on every start. Before the system holds anything real, run
+`spp-seed-users -remove-demo` and create an administrator with
+`spp-seed-users -admin <name>`.
+
 ### With Docker
 
 ```bash
@@ -90,9 +125,8 @@ database that already holds stock unless given `-force`.
 
 #### Trying it with logins
 
-By default there is no sign-in: every screen is open and every button works.
-To see the role separation instead, turn on the application's own login and
-create one account per role:
+This compose file leaves sign-in off: every screen is open and every button
+works. (`docker-compose.demo.yml` above turns it on for you.) To do it by hand:
 
 ```bash
 docker compose exec app spp-seed-users -demo     # or: cd backend && go run ./cmd/seed-users -demo

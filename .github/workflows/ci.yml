@@ -230,12 +230,68 @@ jobs:
             http://127.0.0.1:8080/api/v1/inventory/movements)
           test "$code" = 403
 
-      # Both containers, because either one can be the reason a step failed.
+      # The demo compose file is the one somebody evaluating this actually
+      # runs, and it has its own entrypoint that seeds before serving. Running
+      # it here is the only place that path is exercised, since it is the whole
+      # deliverable for a user test.
+      - name: Check the demo entrypoint
+        run: |
+          docker compose -f docker-compose.demo.yml config --quiet
+
+          docker rm -f spp-auth || true
+          psql() { docker run --rm --network host -e PGPASSWORD=spp postgres:16 psql -h 127.0.0.1 -U spp "$@"; }
+          psql -d postgres -qc 'DROP DATABASE IF EXISTS spp_demo' -c 'CREATE DATABASE spp_demo'
+
+          # Twice, from empty: the second run proves a restart neither
+          # duplicates the seeded data nor exits non-zero.
+          for run in 1 2; do
+            docker rm -f spp-demo 2>/dev/null || true
+            docker run -d --name spp-demo --network host \
+              --entrypoint /usr/local/bin/spp-demo \
+              -e SPP_DATABASE_URL='postgres://spp:spp@127.0.0.1:5432/spp_demo?sslmode=disable' \
+              -e SPP_ADDR=':8080' \
+              -e SPP_AUTH_MODE=local \
+              -e SPP_OVERRIDE_ROLE=ADMIN \
+              kss-spp:ci
+
+            for i in $(seq 1 60); do
+              if curl -fsS http://127.0.0.1:8080/api/v1/health >/dev/null 2>&1; then
+                break
+              fi
+              sleep 1
+            done
+            echo "--- demo run $run came up ---"
+          done
+
+          # A demo nobody can sign in to is not a demo.
+          token=$(curl -fsS -X POST http://127.0.0.1:8080/api/v1/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"admin","password":"Demo-Sugar-2027"}' \
+            | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+          test -n "$token"
+
+          # And one with no stock in it shows every warehouse at 0%.
+          dashboard=$(curl -fsS -H "Authorization: Bearer $token" \
+            'http://127.0.0.1:8080/api/v1/dashboard/storage-capacity?factoryId=1')
+          echo "$dashboard" | grep -q '"RAW-POOL"'
+          lines=$(curl -fsS -H "Authorization: Bearer $token" \
+            'http://127.0.0.1:8080/api/v1/inventory/balances?nonZeroOnly=true' \
+            | grep -o '"storageCode"' | wc -l)
+          echo "stock lines after two runs: $lines"
+          if [ "$lines" -ne 14 ]; then
+            echo "Expected 14 stock lines. Two runs producing 28 means the second"
+            echo "seeded on top of the first, so a container restart doubles the"
+            echo "demo position."
+            exit 1
+          fi
+
+      # Every container, because any one of them can be the reason a step failed.
       - name: Container logs
         if: always()
         run: |
           docker logs spp || true
           docker logs spp-auth || true
+          docker logs spp-demo || true
 
   webapp:
     name: UI5 dashboard build

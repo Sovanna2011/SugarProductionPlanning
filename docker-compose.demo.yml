@@ -1,0 +1,70 @@
+# The demo system: PostgreSQL, the API, the dashboard, the 2026/27 plan, a
+# stock position and five accounts — in one command.
+#
+#   docker compose -f docker-compose.demo.yml up --build
+#   open http://localhost:8080
+#
+# Sign in as admin, planner, warehouse, refinery or viewer, all with the
+# password Demo-Sugar-2027, which the login screen also shows. Each has
+# different roles, so the screens and the buttons change with the account.
+#
+# This is for evaluation and user testing. It is deliberately not the file to
+# deploy: the accounts have a published password, the database password is the
+# default, and the cookie is not marked Secure because this is plain HTTP.
+# Use docker-compose.yml for anything real, and read docs/security.md.
+
+name: kss-spp-demo
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: spp
+      POSTGRES_PASSWORD: spp
+      POSTGRES_DB: spp
+    # A named volume, separate from the production compose file's, so a demo
+    # cannot land on top of a real database.
+    volumes:
+      - demo-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U spp -d spp"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+    # The demo entrypoint seeds before serving. Every step is safe to repeat,
+    # so a restart neither duplicates data nor fails.
+    entrypoint: ["/usr/local/bin/spp-demo"]
+    environment:
+      SPP_DATABASE_URL: postgres://spp:spp@db:5432/spp?sslmode=disable
+      SPP_ADDR: ":8080"
+      SPP_WEB_DIR: /app/web
+      SPP_LOG_LEVEL: ${SPP_LOG_LEVEL:-info}
+
+      # The point of the demo: sign-in on, roles enforced, and the capacity
+      # override restricted to an administrator so the difference is visible.
+      SPP_AUTH_MODE: local
+      SPP_OVERRIDE_ROLE: ADMIN
+
+      # Plain HTTP on localhost, so a Secure cookie would be discarded by the
+      # browser and the login would look broken. Never carry this to a real
+      # deployment.
+      SPP_SESSION_COOKIE_SECURE: "false"
+
+      # Which day of the season to load the stock position from. 2027-04-10 is
+      # the raw sugar peak, 280 t under capacity.
+      SPP_DEMO_DATE: ${SPP_DEMO_DATE:-2027-02-15}
+      SPP_DEMO_PORT: ${SPP_PORT:-8080}
+    ports:
+      - "${SPP_PORT:-8080}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  demo-db-data:

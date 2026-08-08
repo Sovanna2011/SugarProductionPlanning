@@ -55,6 +55,11 @@ WORKDIR /app
 COPY --from=backend /out/spp-server /out/spp-migrate /out/spp-seed-demo /out/spp-seed-users /usr/local/bin/
 COPY --from=webapp  /src/dist /app/web
 
+# The demo entrypoint, used by docker-compose.demo.yml. It is only reached when
+# something asks for it; the default entrypoint below is still the plain server.
+COPY scripts/demo-entrypoint.sh /usr/local/bin/spp-demo
+RUN chmod +x /usr/local/bin/spp-demo
+
 ENV SPP_ADDR=:8080 \
     SPP_WEB_DIR=/app/web \
     TZ=Asia/Phnom_Penh
