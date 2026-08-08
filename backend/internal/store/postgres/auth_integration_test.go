@@ -434,3 +434,42 @@ func TestTheApiRefusesTheRightThings(t *testing.T) {
 		t.Fatalf("a read with a signed-out token returned %d, want 401", code)
 	}
 }
+
+// TestDuplicateCodeIsAnAnswerNotAFailure pins a defect the role probe found:
+// creating a record whose code is already taken reached the caller as a 500
+// and a generic "internal error", which tells somebody who simply reused a
+// code nothing about what to do next.
+func TestDuplicateCodeIsAnAnswerNotAFailure(t *testing.T) {
+	store, ctx := open(t)
+	svc := service.New(store)
+
+	in := service.PackagingTypeInput{
+		Code:         "PKG-DUPTEST",
+		Description:  "Integration test packaging",
+		NetWeight:    25,
+		NetWeightUOM: "KG",
+	}
+
+	if _, err := svc.SavePackagingType(ctx, in); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	t.Cleanup(func() {
+		cleanup, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_, _ = store.Pool().Exec(cleanup, `DELETE FROM packaging_types WHERE code = $1`, in.Code)
+	})
+
+	// The same call again: no version, so it means "create", and the code is
+	// taken. That is the caller's mistake, and the answer has to say so.
+	_, err := svc.SavePackagingType(ctx, in)
+	if err == nil {
+		t.Fatal("creating a second packaging type with the same code was accepted")
+	}
+	if !errors.Is(err, service.ErrValidation) {
+		t.Fatalf("a duplicate code came back as %v, which the API answers with 500 and "+
+			"an unhelpful \"internal error\"", err)
+	}
+	if !strings.Contains(err.Error(), "version") {
+		t.Fatalf("the message does not say how to update the existing record instead: %v", err)
+	}
+}

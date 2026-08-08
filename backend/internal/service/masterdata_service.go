@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/auth"
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/capacity"
@@ -293,7 +294,29 @@ func translateWriteError(err error) error {
 		return fmt.Errorf("%w: %s", ErrConflict, err.Error())
 	case errors.Is(err, pgx.ErrNoRows):
 		return fmt.Errorf("%w: no such record to update", ErrNotFound)
-	default:
-		return err
 	}
+
+	// A constraint the database enforces is something the caller did, not
+	// something that went wrong. Left untranslated these become a 500 and a
+	// generic "internal error", which tells somebody who simply reused a code
+	// nothing at all about what to do next.
+	//
+	// The messages deliberately describe the rule rather than quoting the
+	// constraint, which would name tables and columns to no one's benefit.
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		switch pgErr.Code {
+		case "23505": // unique_violation
+			return fmt.Errorf("%w: that code is already in use. To change the existing record, "+
+				"send it with the version you read; leaving the version out means creating a new one",
+				ErrValidation)
+		case "23503": // foreign_key_violation
+			return fmt.Errorf("%w: this refers to a record that does not exist, or is still "+
+				"referred to by another one", ErrValidation)
+		case "23514": // check_violation
+			return fmt.Errorf("%w: the values break a rule the database enforces, such as a "+
+				"negative quantity or a status outside the allowed set", ErrValidation)
+		}
+	}
+	return err
 }
