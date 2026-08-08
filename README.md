@@ -56,7 +56,7 @@ backend/
     ├── service/         Dashboard, projection, plan vs actual, posting, master data
     ├── httpapi/         Routing and JSON
     └── config/          Environment configuration
-webapp/                  SAP UI5 Storage Capacity Dashboard
+webapp/                  SAP UI5 app: dashboard + master data maintenance
 scripts/                 Workbook extraction
 docs/                    Data model, plan analysis, source documents
 ```
@@ -234,8 +234,10 @@ GET  /health
 
 ### Maintaining master data
 
-Everything the requirement calls configurable is maintained through the API,
-not by editing SQL. Omit `version` to create; supply the stored `version` to
+Everything the requirement calls configurable is maintained through the
+**Master Data** screen in the dashboard, or through the API directly — never by
+editing SQL. The screen has a tab per master: storage locations, the
+warehouse + product + packaging matrix, packaging types and alert bands. Omit `version` to create; supply the stored `version` to
 update, and a stale one is refused with `409 Conflict` so two editors cannot
 silently overwrite each other.
 

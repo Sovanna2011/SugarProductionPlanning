@@ -16,6 +16,9 @@ sap.ui.define([
 
 			this.setModel(new JSONModel(Device), "device");
 
+			// The app model is owned by the component so the dashboard and the
+			// master data screens share one set of filters and master data.
+
 			// The dashboard state: filters, the loaded payload and busy flags.
 			this.setModel(new JSONModel({
 				busy: false,
@@ -40,8 +43,17 @@ sap.ui.define([
 					alerts: []
 				},
 				projection: null,
-				projectionScopes: []
+				projectionScopes: [],
+				appBusy: false,
+				master: {
+					storageLocations: [],
+					capacities: [],
+					packagingTypes: [],
+					thresholds: []
+				}
 			}), "app");
+
+			this.getRouter().initialize();
 		},
 
 		/**

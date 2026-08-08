@@ -63,6 +63,8 @@ type PackagingType struct {
 	WeightInTon  float64 `json:"weightInTon"`
 	IsBulk       bool    `json:"isBulk"`
 	Status       string  `json:"status"`
+	// Version supports optimistic locking on update.
+	Version int `json:"version"`
 }
 
 // ProductPackaging is a product + packaging combination (requirement section 6).
@@ -108,6 +110,8 @@ type StorageLocation struct {
 	EffectiveFrom          time.Time  `json:"effectiveFrom"`
 	EffectiveTo            *time.Time `json:"effectiveTo,omitempty"`
 	Remark                 string     `json:"remark"`
+	// Version supports optimistic locking on update.
+	Version int `json:"version"`
 }
 
 // StorageGroup is a pool of locations planned against one shared ceiling.
@@ -156,6 +160,8 @@ type StorageProductCapacity struct {
 	EffectiveTo          *time.Time `json:"effectiveTo,omitempty"`
 	Status               string     `json:"status"`
 	Remark               string     `json:"remark"`
+	// Version supports optimistic locking on update.
+	Version int `json:"version"`
 }
 
 // InventoryBalance is stock held for one Factory + Storage + Product +

@@ -19,6 +19,11 @@
 		<headerContent>
 			<Text text="{app>/dashboard/factoryName}" class="sppHeaderText"/>
 			<Button
+				icon="sap-icon://settings"
+				text="{i18n>masterDataTitle}"
+				tooltip="{i18n>masterDataTooltip}"
+				press=".onOpenMasterData"/>
+			<Button
 				icon="sap-icon://refresh"
 				tooltip="{i18n>refresh}"
 				press=".onRefresh"/>

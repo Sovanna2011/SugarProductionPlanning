@@ -26,10 +26,10 @@
 	},
 	"sap.ui5": {
 		"rootView": {
-			"viewName": "kss.spp.view.Dashboard",
+			"viewName": "kss.spp.view.App",
 			"type": "XML",
 			"async": true,
-			"id": "dashboard"
+			"id": "app"
 		},
 		"dependencies": {
 			"minUI5Version": "1.120.0",
@@ -63,6 +63,42 @@
 					"uri": "css/style.css"
 				}
 			]
+		},
+		"routing": {
+			"config": {
+				"routerClass": "sap.m.routing.Router",
+				"type": "View",
+				"viewType": "XML",
+				"path": "kss.spp.view",
+				"controlId": "app",
+				"controlAggregation": "pages",
+				"async": true,
+				"transition": "slide"
+			},
+			"routes": [
+				{
+					"pattern": "",
+					"name": "dashboard",
+					"target": "dashboard"
+				},
+				{
+					"pattern": "master-data",
+					"name": "masterData",
+					"target": "masterData"
+				}
+			],
+			"targets": {
+				"dashboard": {
+					"id": "dashboard",
+					"name": "Dashboard",
+					"level": 1
+				},
+				"masterData": {
+					"id": "masterData",
+					"name": "MasterData",
+					"level": 2
+				}
+			}
 		}
 	}
 }

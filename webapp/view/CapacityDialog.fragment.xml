@@ -1,0 +1,96 @@
+<core:FragmentDefinition
+	xmlns="sap.m"
+	xmlns:core="sap.ui.core"
+	xmlns:f="sap.ui.layout.form">
+
+	<Dialog
+		id="capacityDialog"
+		title="{edit>/title}"
+		contentWidth="34rem"
+		draggable="true"
+		resizable="true">
+
+		<content>
+			<f:SimpleForm
+				layout="ResponsiveGridLayout"
+				editable="true"
+				labelSpanXL="5" labelSpanL="5" labelSpanM="5" labelSpanS="12"
+				columnsXL="1" columnsL="1">
+				<f:content>
+
+					<Label text="{i18n>warehouse}" required="true"/>
+					<Select
+						selectedKey="{edit>/storageCode}"
+						enabled="{= !${edit>/isUpdate} }"
+						width="100%"
+						items="{
+							path: 'app>/master/storageLocations',
+							templateShareable: false
+						}">
+						<core:Item key="{app>storageCode}" text="{app>storageCode} — {app>storageName}"/>
+					</Select>
+
+					<Label text="{i18n>product}" required="true"/>
+					<Select
+						selectedKey="{edit>/productCode}"
+						enabled="{= !${edit>/isUpdate} }"
+						width="100%"
+						items="{
+							path: 'app>/products',
+							templateShareable: false
+						}">
+						<core:Item key="{app>code}" text="{app>name}"/>
+					</Select>
+
+					<Label text="{i18n>packaging}" required="true"/>
+					<Select
+						selectedKey="{edit>/packagingCode}"
+						enabled="{= !${edit>/isUpdate} }"
+						width="100%"
+						items="{
+							path: 'app>/packagingTypes',
+							templateShareable: false
+						}">
+						<core:Item key="{app>code}" text="{app>description}"/>
+					</Select>
+
+					<Label text="{i18n>maxPackages}"/>
+					<Input
+						value="{edit>/maximumPackageQuantity}"
+						type="Number"
+						placeholder="{i18n>leaveBlankUnlimited}"/>
+
+					<Label text="{i18n>maxWeight}"/>
+					<Input
+						value="{edit>/maximumWeightQuantity}"
+						type="Number"
+						description="TON"
+						placeholder="{i18n>leaveBlankUnlimited}"/>
+
+					<Label text="{i18n>status}"/>
+					<Select selectedKey="{edit>/status}" width="100%">
+						<core:Item key="ACTIVE" text="{i18n>active}"/>
+						<core:Item key="INACTIVE" text="{i18n>inactive}"/>
+					</Select>
+
+					<Label text="{i18n>remark}"/>
+					<TextArea value="{edit>/remark}" rows="2" growing="true"/>
+
+				</f:content>
+			</f:SimpleForm>
+
+			<MessageStrip
+				class="sapUiSmallMargin"
+				type="Information"
+				showIcon="true"
+				text="{i18n>capacityHint}"/>
+		</content>
+
+		<beginButton>
+			<Button text="{i18n>save}" type="Emphasized" press=".onSaveCapacity"/>
+		</beginButton>
+		<endButton>
+			<Button text="{i18n>cancel}" press=".onCloseDialog"/>
+		</endButton>
+	</Dialog>
+</core:FragmentDefinition>

@@ -59,7 +59,7 @@ const storageLocationColumns = `
 	l.physical_capacity, u.code,
 	l.minimum_stock_level, l.safe_capacity_percentage,
 	l.allow_mixed_products, l.allow_mixed_batches,
-	l.status, l.effective_from, l.effective_to, l.remark`
+	l.status, l.effective_from, l.effective_to, l.remark, l.version`
 
 func scanStorageLocation(r pgx.Rows) (domain.StorageLocation, error) {
 	var v domain.StorageLocation
@@ -68,7 +68,7 @@ func scanStorageLocation(r pgx.Rows) (domain.StorageLocation, error) {
 		&v.PhysicalCapacity, &v.CapacityUOM,
 		&v.MinimumStockLevel, &v.SafeCapacityPercentage,
 		&v.AllowMixedProducts, &v.AllowMixedBatches,
-		&v.Status, &v.EffectiveFrom, &v.EffectiveTo, &v.Remark)
+		&v.Status, &v.EffectiveFrom, &v.EffectiveTo, &v.Remark, &v.Version)
 	return v, err
 }
 
@@ -191,7 +191,7 @@ func (s *Store) ListProducts(ctx context.Context) ([]domain.Product, error) {
 // ListPackagingTypes returns the packaging master.
 func (s *Store) ListPackagingTypes(ctx context.Context) ([]domain.PackagingType, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT k.id, k.code, k.description, k.net_weight, u.code, k.weight_in_ton, k.is_bulk, k.status
+		SELECT k.id, k.code, k.description, k.net_weight, u.code, k.weight_in_ton, k.is_bulk, k.status, k.version
 		FROM packaging_types k
 		JOIN uoms u ON u.id = k.net_weight_uom_id
 		WHERE k.status = 'ACTIVE'
@@ -202,7 +202,7 @@ func (s *Store) ListPackagingTypes(ctx context.Context) ([]domain.PackagingType,
 	return collect(rows, func(r pgx.Rows) (domain.PackagingType, error) {
 		var v domain.PackagingType
 		err := r.Scan(&v.ID, &v.Code, &v.Description, &v.NetWeight, &v.NetWeightUOM,
-			&v.WeightInTon, &v.IsBulk, &v.Status)
+			&v.WeightInTon, &v.IsBulk, &v.Status, &v.Version)
 		return v, err
 	})
 }
@@ -272,7 +272,7 @@ func (s *Store) ListStorageProductCapacity(ctx context.Context, f CapacityFilter
 		       c.packaging_type_id, k.code, k.description, k.weight_in_ton,
 		       c.maximum_package_quantity, c.maximum_weight_quantity,
 		       c.minimum_stock_quantity, c.maximum_safe_quantity, u.code,
-		       c.effective_from, c.effective_to, c.status, c.remark
+		       c.effective_from, c.effective_to, c.status, c.remark, c.version
 		FROM storage_product_capacity c
 		JOIN storage_locations l ON l.id = c.storage_location_id
 		JOIN products p ON p.id = c.product_id
@@ -290,7 +290,7 @@ func (s *Store) ListStorageProductCapacity(ctx context.Context, f CapacityFilter
 			&v.PackagingTypeID, &v.PackagingCode, &v.PackagingDescription, &v.WeightPerPackage,
 			&v.MaximumPackageQty, &v.MaximumWeightQty,
 			&v.MinimumStockQty, &v.MaximumSafeQty, &v.WeightUOM,
-			&v.EffectiveFrom, &v.EffectiveTo, &v.Status, &v.Remark)
+			&v.EffectiveFrom, &v.EffectiveTo, &v.Status, &v.Remark, &v.Version)
 		return v, err
 	})
 }

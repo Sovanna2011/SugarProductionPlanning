@@ -84,6 +84,34 @@ sap.ui.define([], function () {
 		},
 
 		/**
+		 * The per-package conversion factor, shown with enough precision to
+		 * distinguish 0.025 from 0.050.
+		 */
+		tonFactor: function (value) {
+			if (!isNumber(value)) {
+				return "—";
+			}
+			return group(value, 3) + " t";
+		},
+
+		/**
+		 * Live preview of the conversion the server will derive, so an
+		 * operator sees the factor before saving rather than after.
+		 */
+		conversionPreview: function (netWeight, uom, isBulk) {
+			if (isBulk) {
+				return "Bulk packaging has no package count; capacity is managed by weight.";
+			}
+			var n = Number(netWeight);
+			if (!isFinite(n) || n <= 0) {
+				return "Enter a net weight above zero.";
+			}
+			var tons = (uom === "TON") ? n : n / 1000;
+			return "1 package = " + group(tons, 3) + " t · " +
+				"1,000 packages = " + group(tons * 1000, 3) + " t";
+		},
+
+		/**
 		 * The headline the requirement asks to be highlighted: the first date
 		 * the scope is expected to overflow.
 		 */

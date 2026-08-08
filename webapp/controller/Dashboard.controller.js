@@ -1,53 +1,39 @@
 sap.ui.define([
-	"sap/ui/core/mvc/Controller",
+	"kss/spp/controller/BaseController",
 	"sap/ui/model/json/JSONModel",
 	"sap/m/MessageToast",
 	"sap/ui/core/Fragment",
 	"kss/spp/model/formatter"
-], function (Controller, JSONModel, MessageToast, Fragment, formatter) {
+], function (BaseController, JSONModel, MessageToast, Fragment, formatter) {
 	"use strict";
 
-	return Controller.extend("kss.spp.controller.Dashboard", {
+	return BaseController.extend("kss.spp.controller.Dashboard", {
 
 		formatter: formatter,
 
 		onInit: function () {
-			this._model = this.getOwnerComponent().getModel("app");
-			this._api = this.getOwnerComponent().getApiBase();
+			this._model = this.getAppModel();
+			this._api = this.getApiBase();
 			this._loadMasterData().then(this._loadDashboard.bind(this));
 		},
 
-		// --- data loading ----------------------------------------------------
-
-		/**
-		 * GETs a JSON endpoint, throwing on a non-2xx so one failed call
-		 * surfaces as a message strip rather than an empty dashboard.
-		 */
-		_get: function (sPath) {
-			return fetch(this._api + "/api/v1/" + sPath, {
-				headers: { "Accept": "application/json" }
-			}).then(function (res) {
-				if (!res.ok) {
-					return res.json()
-						.catch(function () { return { error: res.statusText }; })
-						.then(function (body) {
-							throw new Error(body.error || ("HTTP " + res.status));
-						});
-				}
-				return res.json();
-			});
+		/** Opens the master data maintenance screens. */
+		onOpenMasterData: function () {
+			this.getRouter().navTo("masterData");
 		},
+
+		// --- data loading ----------------------------------------------------
 
 		_loadMasterData: function () {
 			var that = this;
 			this._model.setProperty("/busy", true);
 
 			return Promise.all([
-				this._get("factories"),
-				this._get("master/storage-types"),
-				this._get("master/storage-locations"),
-				this._get("master/products"),
-				this._get("master/packaging-types")
+				this.get("factories"),
+				this.get("master/storage-types"),
+				this.get("master/storage-locations"),
+				this.get("master/products"),
+				this.get("master/packaging-types")
 			]).then(function (aResults) {
 				// A leading blank entry gives each filter an "all" option.
 				that._model.setProperty("/factories", aResults[0]);
@@ -85,7 +71,7 @@ sap.ui.define([
 			this._model.setProperty("/busy", true);
 			this._model.setProperty("/error", "");
 
-			return this._get("dashboard/storage-capacity?" + oParams.toString())
+			return this.get("dashboard/storage-capacity?" + oParams.toString())
 				.then(function (oData) {
 					that._model.setProperty("/dashboard", oData);
 					that._model.setProperty("/loaded", true);
@@ -138,7 +124,7 @@ sap.ui.define([
 			if (iFactory) { oParams.set("factoryId", iFactory); }
 
 			this._model.setProperty("/busy", true);
-			this._get("planning/projection?" + oParams.toString())
+			this.get("planning/projection?" + oParams.toString())
 				.then(function (oProjection) {
 					that._openProjectionDialog(sName, oProjection);
 				})

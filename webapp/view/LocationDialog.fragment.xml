@@ -1,0 +1,99 @@
+<core:FragmentDefinition
+	xmlns="sap.m"
+	xmlns:core="sap.ui.core"
+	xmlns:l="sap.ui.layout"
+	xmlns:f="sap.ui.layout.form">
+
+	<Dialog
+		id="locationDialog"
+		title="{edit>/title}"
+		contentWidth="34rem"
+		draggable="true"
+		resizable="true">
+
+		<content>
+			<f:SimpleForm
+				layout="ResponsiveGridLayout"
+				editable="true"
+				labelSpanXL="4" labelSpanL="4" labelSpanM="4" labelSpanS="12"
+				columnsXL="1" columnsL="1">
+				<f:content>
+
+					<Label text="{i18n>code}" required="true"/>
+					<Input
+						value="{edit>/storageCode}"
+						editable="{= !${edit>/isUpdate} }"
+						placeholder="FG-WH04"/>
+
+					<Label text="{i18n>name}" required="true"/>
+					<Input value="{edit>/storageName}" placeholder="Finished Sugar Warehouse 4"/>
+
+					<Label text="{i18n>storageType}" required="true"/>
+					<Select
+						selectedKey="{edit>/storageTypeCode}"
+						width="100%"
+						items="{
+							path: 'app>/storageTypes',
+							templateShareable: false
+						}">
+						<core:Item key="{app>code}" text="{app>name}"/>
+					</Select>
+
+					<Label text="{i18n>capacity}" required="true"/>
+					<Input
+						value="{edit>/physicalCapacity}"
+						type="Number"
+						description="{edit>/capacityUom}"/>
+
+					<Label text="{i18n>safePercent}" required="true"/>
+					<Input
+						value="{edit>/safeCapacityPercentage}"
+						type="Number"
+						description="%"/>
+
+					<Label text="{i18n>minimumStock}"/>
+					<Input
+						value="{edit>/minimumStockLevel}"
+						type="Number"
+						description="{edit>/capacityUom}"/>
+
+					<Label text="{i18n>allowMixedProducts}"/>
+					<Switch state="{edit>/allowMixedProducts}"/>
+
+					<Label text="{i18n>allowMixedBatches}"/>
+					<Switch state="{edit>/allowMixedBatches}"/>
+
+					<Label text="{i18n>status}"/>
+					<Select selectedKey="{edit>/status}" width="100%">
+						<core:Item key="ACTIVE" text="{i18n>active}"/>
+						<core:Item key="INACTIVE" text="{i18n>inactive}"/>
+					</Select>
+
+					<Label text="{i18n>remark}"/>
+					<TextArea value="{edit>/remark}" rows="2" growing="true"/>
+
+				</f:content>
+			</f:SimpleForm>
+
+			<!-- Only offered once the server has refused a shrink. -->
+			<MessageStrip
+				class="sapUiSmallMargin"
+				type="Warning"
+				showIcon="true"
+				visible="{edit>/showForce}"
+				text="{i18n>forceHint}"/>
+			<CheckBox
+				class="sapUiSmallMarginBegin"
+				visible="{edit>/showForce}"
+				selected="{edit>/force}"
+				text="{i18n>forceLabel}"/>
+		</content>
+
+		<beginButton>
+			<Button text="{i18n>save}" type="Emphasized" press=".onSaveLocation"/>
+		</beginButton>
+		<endButton>
+			<Button text="{i18n>cancel}" press=".onCloseDialog"/>
+		</endButton>
+	</Dialog>
+</core:FragmentDefinition>
