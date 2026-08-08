@@ -53,41 +53,61 @@ jobs:
       # to it: the workflow's own token is not allowed to create the site, and
       # the error it gives when it tries — "Resource not accessible by
       # integration" — says nothing about what to do. This says it.
+      # Waiting on a setting nobody has clicked yet is not a broken commit, so
+      # this reports and skips rather than failing. A red mark on every push
+      # for something the code cannot fix teaches people to ignore red marks.
       - name: Check that Pages is switched on
+        id: precheck
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Pages URLs are lower-case whatever the owner's name looks like.
+          site="https://$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]').github.io/${{ github.event.repository.name }}/"
+          echo "site=$site" >> "$GITHUB_OUTPUT"
+
           if gh api "repos/${{ github.repository }}/pages" >/dev/null 2>&1; then
-            echo "Pages is enabled; deploying."
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "Pages is switched on; deploying to $site"
             exit 0
           fi
 
+          echo "enabled=false" >> "$GITHUB_OUTPUT"
           {
-            echo "## GitHub Pages is not switched on yet"
+            echo "## The demo pages are built and waiting"
             echo
-            echo "It takes one click, once. Everything after it is automatic."
+            echo "They cannot be published until GitHub Pages is switched on, which a"
+            echo "workflow is not allowed to do for itself. It takes one click, once;"
+            echo "everything after it is automatic."
             echo
             echo "1. Open <https://github.com/${{ github.repository }}/settings/pages>"
             echo "2. Under **Build and deployment**, set **Source** to **GitHub Actions**"
-            echo "3. Re-run this workflow"
+            echo "3. Re-run this workflow, or push anything"
             echo
-            echo "The demo will then be at <https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/>"
+            echo "The demo will then be at <$site>"
           } >> "$GITHUB_STEP_SUMMARY"
 
-          echo "Pages is not switched on — see this run's summary for the one setting to change."
-          exit 1
+          echo "::warning::GitHub Pages is not switched on, so there is nothing to publish to. See this run's summary."
 
       - uses: actions/configure-pages@v5
+        if: steps.precheck.outputs.enabled == 'true'
 
       - uses: actions/upload-pages-artifact@v3
+        if: steps.precheck.outputs.enabled == 'true'
         with:
           path: build/pages
 
       - id: deploy
+        if: steps.precheck.outputs.enabled == 'true'
         uses: actions/deploy-pages@v4
 
       - name: Where it went
+        if: steps.precheck.outputs.enabled == 'true'
         run: |
           url='${{ steps.deploy.outputs.page_url }}'
-          echo "Front door:      $url"
-          echo "Clickable login: ${url}login.html"
+          {
+            echo "## Published"
+            echo
+            echo "- Front door: <$url>"
+            echo "- Clickable login: <${url}login.html>"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Published to $url"
