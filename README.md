@@ -65,6 +65,17 @@ docs/                    Data model, plan analysis, source documents
 
 ### The demo system
 
+**Nothing at all to install or sign in to:** the demo pages are published at
+
+  <https://sovanna2011.github.io/SugarProductionPlanning/>
+
+including a sign-in flow you can click through. It is a faithful reproduction
+driven by responses captured from the running system, not the system itself —
+that needs a server and a database, which the two routes below provide.
+
+*(Publishing needs GitHub Pages switched on once: **Settings → Pages → Source →
+GitHub Actions**. The workflow says so in its run summary until it is.)*
+
 **Nothing to install:** open the repository in GitHub Codespaces and it starts
 itself.
 
