@@ -38,10 +38,16 @@
 		}
 	},
 
-	// Building the image takes a few minutes the first time. Everything it does
-	// is safe to repeat, so a Codespace that is stopped and restarted comes
-	// back with the same data rather than seeding it twice.
-	"postStartCommand": "docker compose -f docker-compose.demo.yml up -d --build",
+	// Build once, when the Codespace is created — it takes a few minutes, and
+	// waitFor holds "ready" until it is done so the browser does not open on a
+	// port nothing is listening to yet.
+	"postCreateCommand": "docker compose -f docker-compose.demo.yml build",
+	"waitFor": "postCreateCommand",
+
+	// Start on every boot. Everything the entrypoint does is safe to repeat, so
+	// a Codespace that is stopped and resumed comes back with the same data
+	// rather than seeding it twice.
+	"postStartCommand": "docker compose -f docker-compose.demo.yml up -d",
 
 	"customizations": {
 		"vscode": {
