@@ -73,8 +73,17 @@ docs/                    Data model, plan analysis, source documents
 in as any of the five accounts and it behaves like the real one: what each role
 may and may not do, the storage position, editing the storage master data,
 editing the daily production plan — which moves the storage curves with it —
-and posting a movement, including one the capacity rules refuse and the
-sentence they refuse it with.
+posting a movement, including one the capacity rules refuse and the sentence
+they refuse it with, and comparing any one of the 276 days against what was
+actually posted.
+
+That last screen keeps the rule the real system keeps: **actuals are derived
+from posted movements, never keyed in.** Recording a day's actual production
+writes the receipts and issues it implies, through the ordinary posting path,
+and the actual column adds them up — so every figure can be traced to the
+movements underneath it, listed on the same screen. It also shows what that
+rule costs: cane crushed is not stock, so no movement carries it, so the screen
+says "not derivable" instead of a zero.
 
 It is not a mock-up. The master data, the capacity rules and all 276 days of
 the season plan are the real ones: `scripts/extract_seed_data.py` reads them

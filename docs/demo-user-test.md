@@ -83,55 +83,64 @@ they hesitate is the finding; what they say afterwards is commentary.
 
 ### As `warehouse`
 
-5. Receive 500 t of raw sugar in bulk into Raw Warehouse 1.
-6. Receive enough to push a warehouse past its safe level. **What does the
+5. Open **Actual against plan**, pick a day nobody has reported, and record what
+   was actually made and shipped. **Then say where the actual figures came
+   from.** *(They are added up from the movements the recording posted, and
+   those movements are listed on the same screen. If somebody believes they
+   typed a number into an actual column, ask them to find that column.)*
+6. Find a day where the actual closing stock does not match the plan and say
+   why. *(One reason is always there: sugar is packed in whole bags, so a
+   900 t plan lands at 899.6 t. Is that a problem to fix or a fact to
+   accept? Somebody on site knows.)*
+7. Receive 500 t of raw sugar in bulk into Raw Warehouse 1.
+8. Receive enough to push a warehouse past its safe level. **What does the
    system tell you, and is it clear whether the posting went through?**
    *(It should post, with a warning. Above physical capacity it should refuse.)*
-7. Issue raw sugar to remelt from a specific batch.
-8. Try to change a warehouse's capacity. *(Should be refused — is the refusal
+9. Issue raw sugar to remelt from a specific batch.
+10. Try to change a warehouse's capacity. *(Should be refused — is the refusal
    understandable, or does it look like a fault?)*
 
 ### As `planner`
 
-9. Correct a molasses tank's capacity to whatever it really is.
+11. Correct a molasses tank's capacity to whatever it really is.
    *(The seeded 5,000 t is a placeholder from the requirement document; this is
    the task where somebody who knows the site can tell us the real number.)*
-10. Add a new packaging size and give a warehouse a ceiling for it.
-11. Change the alert bands so "nearly full" means something the factory agrees
+12. Add a new packaging size and give a warehouse a ceiling for it.
+13. Change the alert bands so "nearly full" means something the factory agrees
     with.
-12. Open the daily production plan and change one day — say, raise quota sales
+14. Open the daily production plan and change one day — say, raise quota sales
     for 16 Feb 2027. **Then say what it did to the date the finished sugar
     warehouses overflow.** *(It should move: the pool figures follow from the
     production figures, so a change to one is a change to the other. If the
     person cannot tell that anything happened, the screen has failed.)*
-13. Work out how much has to be sold each day for the season to end inside
+15. Work out how much has to be sold each day for the season to end inside
     capacity. *(About 640 t/day holds the closing stock under 69,000 t; about
     890 t/day clears the whole season's production. Do they arrive at
     something near that, and how?)*
-14. Try to post a stock receipt. *(Should be refused.)*
+16. Try to post a stock receipt. *(Should be refused.)*
 
 ### As `admin`
 
-15. Create an account for a real colleague with the right roles, and read out
+17. Create an account for a real colleague with the right roles, and read out
     the password it generates.
-16. Reset somebody's password and sign them out everywhere.
-17. Force a posting that capacity validation blocked, giving a reason. Then
+18. Reset somebody's password and sign them out everywhere.
+19. Force a posting that capacity validation blocked, giving a reason. Then
     find that reason again afterwards.
-18. Try to remove your own administrator role. *(Should be refused if you are
+20. Try to remove your own administrator role. *(Should be refused if you are
     the last one — is the reason clear?)*
 
 ### Which of these the browser-only page cannot do
 
-Tasks 1–9, 12–14 and 18 work in `system.html`. The rest need the real system:
+Tasks 1–11, 14–16 and 20 work in `system.html`. The rest need the real system:
 
-- **10** — adding a packaging size. The browser page shows the packaging master
+- **12** — adding a packaging size. The browser page shows the packaging master
   and every ceiling, but only storage locations are editable in it.
-- **11** — changing the alert bands.
-- **16** — resetting a password and signing somebody out everywhere. One
+- **13** — changing the alert bands.
+- **18** — resetting a password and signing somebody out everywhere. One
   browser holds one session, so there is nowhere else to sign out of.
-- **15** works, except that you type the new password rather than being given a
+- **17** works, except that you type the new password rather than being given a
   generated one.
-- **17** works, but the reason is only findable again in that same browser.
+- **19** works, but the reason is only findable again in that same browser.
 
 If a session is going to cover those, run the real system for it.
 

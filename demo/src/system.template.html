@@ -1003,6 +1003,7 @@ const PAGES = [
   { id: "dashboard", label: "Storage today", needs: null },
   { id: "storage", label: "Storage master data", needs: null },
   { id: "movement", label: "Post a movement", needs: null },
+  { id: "actual", label: "Actual against plan", needs: null },
   { id: "ledger", label: "Movement history", needs: null },
   { id: "plan", label: "Daily production plan", needs: null },
   { id: "users", label: "Users", needs: "administerUsers" },
@@ -1369,6 +1370,332 @@ function runMovement(post) {
   if (res.posted) { renderNav(currentPage()); }
 }
 
+/* =========================================================================
+   Actual against plan, one day at a time (requirement sections 16 and 17).
+
+   The rule that shapes this whole screen is that actuals are *derived from
+   posted movements, never keyed in*. Nobody types "we made 2,090 t today"
+   into an actual column; they post the receipts, and the actual column adds
+   them up. That is what makes the number arguable — you can always ask which
+   movements it came from, and the movement history will tell you.
+
+   It also has a consequence worth seeing rather than hiding: cane crushed is
+   not stock, so no movement carries it, so this screen cannot show an actual
+   for it. It says so instead of showing a zero.
+   ====================================================================== */
+
+/* Which movements count towards which line of the daily production plan. */
+const ACTUAL_LINES = [
+  { key: "cane", label: "Cane crushed", planIndex: 2, derivable: false,
+    why: "Cane is not stored in this system, so no movement carries it" },
+  { key: "raw", label: "Raw sugar made", planIndex: 3, scope: "RAW-POOL",
+    product: "RAW-SUGAR", packaging: "PKG-BULK", movement: "WAREHOUSE_RECEIPT", batch: "RS26001" },
+  { key: "remelt", label: "Raw sugar to remelt", planIndex: 4, scope: "RAW-POOL",
+    product: "RAW-SUGAR", packaging: "PKG-BULK", movement: "REMELT_ISSUE", batch: "RS26001" },
+  { key: "packing", label: "Jumbo bagging out of the warehouse", planIndex: 6, scope: "RAW-POOL",
+    product: "RAW-SUGAR", packaging: "PKG-JUMBO", movement: "PACKING_ISSUE", batch: "RJ26001" },
+  { key: "refined", label: "Refined sugar packed", planIndex: 7, scope: "FG-POOL",
+    product: "REFINED-SUGAR", packaging: "PKG-50KG", movement: "PACKING_RECEIPT", batch: "R26001" },
+  { key: "white", label: "White sugar packed", planIndex: 8, scope: "FG-POOL",
+    product: "WHITE-SUGAR", packaging: "PKG-50KG", movement: "PACKING_RECEIPT", batch: "W26001" },
+  { key: "super", label: "Super refined packed", planIndex: 9, scope: "FG-WH03",
+    product: "SUPER-REFINED", packaging: "PKG-50KG", movement: "PACKING_RECEIPT", batch: "S26001" },
+  { key: "quota", label: "Quota sales delivered", planIndex: 10, scope: "FG-POOL",
+    product: "REFINED-SUGAR", packaging: "PKG-50KG", movement: "SALES_ISSUE", batch: "" },
+];
+
+/** The locations a scope code covers — a group's active members, or itself. */
+function scopeMembers(code) {
+  const members = membersOf[code];
+  if (!members) return [findLocation(code)].filter(Boolean);
+  return members.map(findLocation).filter(l => l && l.status === "ACTIVE");
+}
+
+/** What the movements say happened on one day, per production line. */
+function actualProduction(date) {
+  const out = {};
+  for (const line of ACTUAL_LINES) {
+    if (line.derivable === false) { out[line.key] = null; continue; }
+    const codes = new Set(scopeMembers(line.scope).map(l => l.code));
+    let total = 0;
+    for (const m of db.movements) {
+      if (m.date !== date) continue;
+      if (m.type !== line.movement) continue;
+      if (m.product !== line.product || m.packaging !== line.packaging) continue;
+      if (!codes.has(m.loc)) continue;
+      total += Math.abs(m.weight);
+    }
+    out[line.key] = total;
+  }
+  return out;
+}
+
+/** Movement totals and closing balance for a scope, as at a date. */
+function actualStorage(scopeCode, date) {
+  const codes = new Set(scopeMembers(scopeCode).map(l => l.code));
+  let inWeight = 0, outWeight = 0, closing = 0;
+  for (const m of db.movements) {
+    if (!codes.has(m.loc)) continue;
+    if (m.date === date) {
+      if (m.weight > 0) inWeight += m.weight; else outWeight += -m.weight;
+    }
+    if (m.date <= date) closing += m.weight;
+  }
+  return { in: inWeight, out: outWeight, closing };
+}
+
+function renderActual() {
+  const mayPost = can("postMovements");
+  const dates = db.plan.map(r => r[0]);
+  const chosen = renderActual.date && dates.includes(renderActual.date) ? renderActual.date : SEED_DATE;
+  const planRow = db.plan.find(r => r[0] === chosen);
+  const made = actualProduction(chosen);
+  const posted = db.movements.filter(m => m.date === chosen);
+
+  const varianceCell = (planned, actual) => {
+    if (actual === null) return `<td class="n">—</td><td class="wrap">not derivable</td>`;
+    const v = actual - planned;
+    const chip = Math.abs(v) < 0.0005
+      ? '<span class="chip NORMAL">on plan</span>'
+      : `<span class="chip ${v < 0 ? "HIGH" : "WARNING"}">${v > 0 ? "+" : ""}${num(v)} t</span>`;
+    return `<td class="n">${num(actual)}</td><td>${chip}</td>`;
+  };
+
+  const productionRows = ACTUAL_LINES.map(line => {
+    const planned = planRow[line.planIndex];
+    const actual = line.derivable === false ? null : made[line.key];
+    return `<tr${line.derivable === false ? ' class="dim"' : ""}>
+      <td>${esc(line.label)}</td>
+      <td class="n">${num(planned)}</td>
+      ${varianceCell(planned, actual)}
+      <td class="wrap">${line.derivable === false
+        ? esc(line.why)
+        : `${esc(movementTypeOf[line.movement].name)} of ${esc(productOf[line.product].name)} in ${esc(line.packaging.replace("PKG-", ""))}`}</td>
+    </tr>`;
+  }).join("");
+
+  const scopes = ["RAW-POOL", "FG-POOL", "CON-S01"];
+  const storageRows = scopes.map(code => {
+    const series = db.storagePlan[code] || [];
+    const plan = series.find(r => r[0] === chosen);
+    const act = actualStorage(code, chosen);
+    const capacity = scopeMembers(code).reduce((s, l) => s + l.physicalCapacity, 0);
+    const p = pct(act.closing, capacity);
+    const band = classify(p);
+    const name = membersOf[code]
+      ? SEED.groups.find(g => g.group_code === code).group_name
+      : findLocation(code).name;
+    const variance = plan ? act.closing - plan[4] : null;
+    return `<tr>
+      <td>${esc(name)}<div class="code">${esc(code)}</div></td>
+      <td class="n">${plan ? num(plan[1]) : "—"}</td>
+      <td class="n">${plan ? num(plan[2]) : "—"}</td>
+      <td class="n">${num(act.in)}</td>
+      <td class="n">${plan ? num(plan[3]) : "—"}</td>
+      <td class="n">${num(act.out)}</td>
+      <td class="n">${plan ? num(plan[4]) : "—"}</td>
+      <td class="n">${num(act.closing)}</td>
+      <td>${variance === null ? "—" : (Math.abs(variance) < 0.0005
+        ? '<span class="chip NORMAL">on plan</span>'
+        : `<span class="chip ${variance < 0 ? "HIGH" : "WARNING"}">${variance > 0 ? "+" : ""}${num(variance)} t</span>`)}</td>
+      <td class="n">${num(capacity)}</td>
+      <td><span class="chip ${band.severity}">${esc(band.name)} ${pctText(act.closing, capacity)}</span></td>
+    </tr>`;
+  }).join("");
+
+  view.innerHTML = head("Actual against plan",
+    `What the plan said for one day, and what the posted movements say actually happened.
+     <b>Nothing on this screen is typed in.</b> Every actual is added up from the movement
+     ledger, so any figure here can be traced back to the lines that produced it —
+     which is the only way a variance is worth arguing about.`)
+    + `<div class="toolbar">
+        <label class="field"><span>Day</span><select id="ac-date">
+          ${dates.map(d => `<option value="${d}"${d === chosen ? " selected" : ""}>${human(d)}${d === SEED_DATE ? " — the seeded day" : ""}</option>`).join("")}
+        </select></label>
+        <button class="btn" id="ac-prev" type="button">&larr; Day before</button>
+        <button class="btn" id="ac-next" type="button">Day after &rarr;</button>
+        <button class="btn primary" id="ac-record" type="button"${mayPost ? "" : " disabled"}>Record this day's actual production</button>
+        <span class="spacer"></span>
+        <span class="note">${posted.length} movement${posted.length === 1 ? "" : "s"} posted on this day</span>
+      </div>
+
+      ${chosen === SEED_DATE ? `<div class="msg warn" style="margin-bottom:1rem">
+        The demo's opening position was posted on this day — the whole stock the plan
+        expects the factory to be holding, in one go. So the production actuals below are
+        that opening position rather than one day's output, and they tower over the plan.
+        Pick any other day for a clean comparison.</div>` : ""}
+
+      <h2 style="margin:.2rem 0 .7rem">Production</h2>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Line</th><th class="n">Planned (t)</th><th class="n">Actual (t)</th>
+          <th>Variance</th><th>Where the actual comes from</th></tr></thead>
+        <tbody>${productionRows}</tbody></table></div>
+
+      <h2 style="margin:1.6rem 0 .7rem">Storage</h2>
+      <p class="note" style="max-width:80ch;margin-bottom:.7rem">
+        Plan in and out are <b>net</b> — the workbook books raw sugar into the pool already
+        less what goes straight to remelt. Actual in and out are <b>gross</b>, because a
+        receipt and an issue are two movements and the ledger records both. So those two
+        columns can differ by a lot while the closing figures agree exactly; it is the
+        closing column and the variance that answer "did the day go to plan".</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Scope</th><th class="n">Opening</th><th class="n">Plan in</th><th class="n">Actual in</th>
+          <th class="n">Plan out</th><th class="n">Actual out</th><th class="n">Plan closing</th>
+          <th class="n">Actual closing</th><th>Variance</th><th class="n">Capacity</th><th>Now</th></tr></thead>
+        <tbody>${storageRows}</tbody></table></div>
+
+      <h2 style="margin:1.6rem 0 .7rem">The movements this day is made of</h2>
+      <div class="tablewrap"><table>
+        <thead><tr><th>#</th><th>Type</th><th>Location</th><th>Product</th><th>Pack</th>
+          <th>Batch</th><th class="n">Weight (t)</th><th>By</th><th>Reference</th></tr></thead>
+        <tbody>${posted.length ? posted.map(m => `<tr>
+          <td class="num">#${m.id}</td><td>${esc(m.typeName)}</td><td class="num">${esc(m.loc)}</td>
+          <td>${esc(productOf[m.product].name)}</td><td class="num">${esc(m.packaging.replace("PKG-", ""))}</td>
+          <td class="num">${esc(m.batch || "—")}</td><td class="n">${num(m.weight)}</td>
+          <td class="num">${esc(m.by)}</td><td class="wrap">${esc(m.ref || m.remark || "")}</td></tr>`).join("")
+          : `<tr><td colspan="9">Nothing was posted on ${human(chosen)}, so every actual above is zero.
+             That is not a fault — it is what an unreported day looks like.</td></tr>`}
+        </tbody></table></div>`;
+
+  document.getElementById("ac-date").addEventListener("change", e => {
+    renderActual.date = e.target.value;
+    renderActual();
+  });
+  const step = delta => {
+    const i = dates.indexOf(chosen) + delta;
+    if (i < 0 || i >= dates.length) return;
+    renderActual.date = dates[i];
+    renderActual();
+  };
+  document.getElementById("ac-prev").addEventListener("click", () => step(-1));
+  document.getElementById("ac-next").addEventListener("click", () => step(1));
+  document.getElementById("ac-record").addEventListener("click", () => recordActuals(chosen));
+}
+
+/**
+ * Post the movements a day's actual production implies.
+ *
+ * This is the honest version of "entering actuals": you say what was made and
+ * shipped, and the system writes the receipts and issues that account for it.
+ * The actual column then adds those up. Nothing writes to an actual field,
+ * because there is no actual field.
+ */
+function recordActuals(date) {
+  const planRow = db.plan.find(r => r[0] === date);
+  const made = actualProduction(date);
+
+  openDialog(`Actual production on ${human(date)}`, `
+    <p class="note" style="margin:0">Enter what actually happened. Saving posts the
+      receipts and issues for the difference between this and what is already posted,
+      through the ordinary posting path — so a figure that will not fit is refused here
+      exactly as it would be on the posting screen.</p>
+    <div class="two">
+      ${ACTUAL_LINES.filter(l => l.derivable !== false).map(l => `
+        <label class="field"><span>${esc(l.label)}</span>
+          <input id="ac-${l.key}" type="number" step="0.001" min="0"
+                 value="${round(made[l.key] || planRow[l.planIndex], 3)}">
+          <span class="note">plan ${num(planRow[l.planIndex])} t${made[l.key]
+            ? ` · ${num(made[l.key])} t already posted` : " · nothing posted yet, so this starts at the plan"}</span>
+        </label>`).join("")}
+    </div>
+    <label class="field"><span>Reference document</span>
+      <input id="ac-ref" type="text" value="PROD-${date.replace(/-/g, "")}"></label>
+    <p class="note">Cane crushed is not on this list because no movement carries it. If the
+      factory needs cane actuals, that is a cane ledger, and it does not exist yet.</p>`,
+    () => {
+      requirePermission("postMovements");
+      const ref = document.getElementById("ac-ref").value.trim();
+      const refusals = [];
+      let postedCount = 0;
+
+      for (const line of ACTUAL_LINES) {
+        if (line.derivable === false) continue;
+        const wanted = Number(document.getElementById("ac-" + line.key).value);
+        if (!isFinite(wanted) || wanted < 0) throw new Error(`${line.label} must be tons, zero or more`);
+        const delta = wanted - (made[line.key] || 0);
+        if (Math.abs(delta) < 0.0005) continue;
+        if (delta < 0) {
+          refusals.push(`${line.label}: ${num(made[line.key])} t is already posted, and a movement is not unposted by typing a smaller number. Reverse it on the posting screen.`);
+          continue;
+        }
+        const results = postAcrossScope({
+          scope: line.scope, product: line.product, packaging: line.packaging,
+          movement: line.movement, batch: line.batch, weight: delta, date, ref,
+        });
+        for (const r of results) {
+          if (r.posted) postedCount++;
+          else refusals.push(`${line.label} into ${r.location}: ` +
+            (r.error || r.validation.findings.filter(f => f.severity === "BLOCK").map(f => f.message).join("; ")));
+        }
+      }
+
+      save();
+      renderActual();
+      if (refusals.length) {
+        toast(`${postedCount} posted. Refused: ${refusals[0]}`, true);
+      } else {
+        toast(postedCount ? `${postedCount} movement${postedCount === 1 ? "" : "s"} posted for ${human(date)}.`
+                          : "Nothing changed.");
+      }
+    });
+}
+
+/**
+ * Spread one quantity across a scope's locations and post it.
+ *
+ * Receipts go where there is room, in proportion to capacity — the same split
+ * the season plan uses, because the plan does not say which of a pool's
+ * warehouses a ton goes into. Issues come out of where the stock actually is,
+ * fullest first, because that part is not a choice.
+ */
+function postAcrossScope(spec) {
+  const members = scopeMembers(spec.scope);
+  const direction = movementTypeOf[spec.movement].direction;
+  const results = [];
+
+  let shares;
+  if (direction === "OUT") {
+    const held = members.map(l => ({ l, held: productStock(l.code, spec.product, spec.packaging).weight }))
+      .filter(x => x.held > EPS)
+      .sort((a, b) => b.held - a.held);
+    const total = held.reduce((s, x) => s + x.held, 0);
+    if (total <= EPS) {
+      return [{ posted: false, location: spec.scope,
+        error: `nothing of that product and packaging is in stock to issue` }];
+    }
+    shares = held.map(x => ({ loc: x.l, weight: spec.weight * x.held / total }));
+  } else {
+    const total = members.reduce((s, l) => s + l.physicalCapacity, 0);
+    if (total <= EPS) return [{ posted: false, location: spec.scope, error: "the scope has no capacity" }];
+    shares = members.map(l => ({ loc: l, weight: spec.weight * l.physicalCapacity / total }));
+  }
+
+  for (const share of shares) {
+    if (share.weight <= 0.0005) continue;
+    const per = packagingOf[spec.packaging].weight_in_ton;
+    const req = {
+      date: spec.date, movementType: spec.movement, storage: share.loc.code,
+      product: spec.product, packaging: spec.packaging, batch: spec.batch, ref: spec.ref,
+      remark: "Actual production recorded for " + spec.date,
+      by: (currentUser() || {}).username || "anonymous",
+    };
+    if (per > 0) {
+      const whole = Math.round(share.weight / per);
+      if (whole < 1) continue;
+      req.packages = whole;
+    } else {
+      req.weight = share.weight;
+    }
+    try {
+      const res = postMovement(req);
+      results.push({ ...res, location: share.loc.code });
+    } catch (err) {
+      results.push({ posted: false, location: share.loc.code, error: err.message });
+    }
+  }
+  return results;
+}
+
 /* --- movement history ----------------------------------------------------- */
 
 function renderLedger() {
@@ -1697,7 +2024,7 @@ function route() {
 
   renderNav(page);
   ({ dashboard: renderDashboard, storage: renderStorage, movement: renderMovement,
-     ledger: renderLedger, plan: renderPlan, users: renderUsers }[page])();
+     actual: renderActual, ledger: renderLedger, plan: renderPlan, users: renderUsers }[page])();
   save();
 }
 
