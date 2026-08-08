@@ -16,11 +16,12 @@ an HTTPS address:
 
 <https://codespaces.new/Sovanna2011/SugarProductionPlanning>
 
-The forwarded port starts Private, so only you can reach it. Making it Public
-in the PORTS tab is what produces a shareable link — and a system anybody with
-that link can sign in to, using a password published in this repository. That
-is fine for an afternoon of user testing on invented data. It is not fine once
-the database holds anything real; see the last section.
+The Codespace makes that address public and prints it, so the people you are
+testing with can just open it — no GitHub account, nothing to install. It is
+genuinely public: no permission check, on accounts whose password is published
+in this repository. Fine for an afternoon of user testing on invented data,
+not fine once the database holds anything real; see the last section. Take it
+back down with `./scripts/share.sh private`.
 
 On your own machine:
 

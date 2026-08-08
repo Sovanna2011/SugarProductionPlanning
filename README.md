@@ -76,17 +76,26 @@ that needs a server and a database, which the two routes below provide.
 *(Publishing needs GitHub Pages switched on once: **Settings → Pages → Source →
 GitHub Actions**. The workflow says so in its run summary until it is.)*
 
-**Nothing to install:** open the repository in GitHub Codespaces and it starts
-itself.
+**The real system, on a public link, one click:** open the repository in
+GitHub Codespaces.
 
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/Sovanna2011/SugarProductionPlanning)
 
-The Codespace brings the stack up, forwards port 8080 and opens it. That
-forward starts **Private** — only you can reach it. To hand the link to
-somebody else, set its visibility to Public in the PORTS tab, and understand
-what that means first: the demo accounts have a password published in this
-repository, so a public forward is a system anybody with the link can sign in
-to. Keep it private, or remove the demo accounts and create real ones.
+It builds, migrates, loads the season plan and a stock position, creates the
+five accounts, starts serving, **makes the port public and prints the link** —
+something like `https://<name>-8080.app.github.dev`. Anybody you send it to can
+sign in; no GitHub account needed.
+
+> **That link is genuinely public.** No account, no permission check, on
+> accounts whose password is published in this repository. For an afternoon of
+> user testing on invented data that is the point. Take it down again with
+> `./scripts/share.sh private`, and before anything real goes in, remove the
+> demo accounts (`spp-seed-users -remove-demo`) and create a real
+> administrator.
+
+The Codespace stops when it idles, and its URL changes when it restarts. A
+permanent address needs a real host — see the deployment note in
+[docs/security.md](docs/security.md).
 
 **On your own machine:** one command, from nothing to a system you can sign in
 to and use:
