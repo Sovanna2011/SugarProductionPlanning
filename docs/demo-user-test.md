@@ -75,6 +75,11 @@ they hesitate is the finding; what they say afterwards is commentary.
 
 ### Everyone, whichever account
 
+0. **In `system.html`, switch the language to Khmer before anything else** and
+   leave it there for the whole session, unless the person you are testing with
+   would rather work in English. The point of the session is what they can get
+   done, not how well they read English. Note anything that stays in English
+   and mattered — that list is the next round of translation.
 1. Sign in. **Without being told**, say which storage is closest to full.
 2. Find how much room is left in the raw sugar warehouses, in tons and in bags.
 3. Find the day the finished sugar warehouses are expected to overflow.
@@ -92,6 +97,11 @@ they hesitate is the finding; what they say afterwards is commentary.
    why. *(One reason is always there: sugar is packed in whole bags, so a
    900 t plan lands at 899.6 t. Is that a problem to fix or a fact to
    accept? Somebody on site knows.)*
+6a. Enter one movement by hand against a single line — say 200 bags of refined
+   sugar into a warehouse you choose — then **reverse it**. *(Watch what they
+   expect reversing to do. If somebody expects the line to disappear, the
+   ledger is not behaving the way they think it should, and that is worth
+   knowing before it holds real stock.)*
 7. Receive 500 t of raw sugar in bulk into Raw Warehouse 1.
 8. Receive enough to push a warehouse past its safe level. **What does the
    system tell you, and is it clear whether the posting went through?**

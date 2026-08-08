@@ -46,9 +46,13 @@
   --radius: 4px;
   --shadow: 0 1px 2px rgba(32, 26, 19, .07), 0 6px 18px rgba(32, 26, 19, .05);
 
-  --display: "IBM Plex Serif", Georgia, "Times New Roman", serif;
-  --body: "IBM Plex Sans", -apple-system, "Segoe UI", Roboto, sans-serif;
-  --data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  /* The Khmer and Thai faces sit behind the Latin ones in every stack. They
+     carry a unicode-range, so they only ever apply to their own script: a
+     storage code stays in Plex whatever language the interface is in, and
+     nothing has to be swapped when the language changes. */
+  --display: "IBM Plex Serif", "Noto Sans Khmer", "Noto Sans Thai", Georgia, serif;
+  --body: "IBM Plex Sans", "Noto Sans Khmer", "Noto Sans Thai", -apple-system, "Segoe UI", sans-serif;
+  --data: "IBM Plex Mono", "Noto Sans Khmer", "Noto Sans Thai", ui-monospace, Menlo, monospace;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -328,6 +332,29 @@ dialog h2 { padding: 1.1rem 1.2rem 0; }
   .two { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* Khmer and Thai stack marks above and below the line, so lines set for Latin
+   collide. They also read smaller at the same point size. */
+:root[lang="km"] body, :root[lang="th"] body { line-height: 1.85; font-size: 15.5px; }
+:root[lang="km"] th, :root[lang="th"] th { letter-spacing: 0; text-transform: none; font-size: .76rem; }
+:root[lang="km"] .eyebrow, :root[lang="th"] .eyebrow { letter-spacing: .04em; text-transform: none; }
+:root[lang="km"] .chip, :root[lang="th"] .chip { line-height: 1.6; }
+
+.langpick {
+  display: flex; gap: 1px; background: var(--rail-line); border-radius: var(--radius);
+  overflow: hidden; border: 1px solid var(--rail-line);
+}
+.langpick button {
+  flex: 1; background: transparent; border: 0; color: var(--rail-muted);
+  padding: .3em .2em; font-size: .8rem; cursor: pointer;
+}
+.langpick button:hover { color: var(--rail-ink); background: #ffffff10; }
+.langpick button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+
+/* On the sign-in screen the picker sits on the pale panel, not the dark rail. */
+.panel .langpick { background: var(--line); border-color: var(--line); }
+.panel .langpick button { color: var(--muted); }
+.panel .langpick button:hover { color: var(--ink); background: var(--surface-2); }
 </style>
 
 <!-- ========================================================================
@@ -376,6 +403,8 @@ dialog h2 { padding: 1.1rem 1.2rem 0; }
       <div id="accounts"></div>
     </div>
 
+    <div data-langhost></div>
+
     <p class="footnote">
       The five accounts differ only in what they are allowed to do, which is the
       point of trying them. There is no server here, so this page compares the
@@ -400,6 +429,7 @@ dialog h2 { padding: 1.1rem 1.2rem 0; }
         <div class="name" id="whoname"></div>
         <div class="roles" id="whoroles"></div>
       </div>
+      <div data-langhost></div>
       <button type="button" id="changepw">Change password</button>
       <button type="button" id="resetdemo">Reset demo data</button>
       <button type="button" id="signout">Sign out</button>
@@ -425,6 +455,395 @@ const SEED = /*{{DATA}}*/;
 const EPS = 1e-6;
 const DEMO_PASSWORD = "Demo-Sugar-2027";
 const STORE_KEY = "spp-demo-system-v2";
+/* Kept apart from the data, so resetting the demo does not also reset the
+   language somebody chose in order to read the reset button. */
+const LANG_KEY = "spp-demo-lang";
+
+/* =========================================================================
+   Language.
+
+   The factory is in Kampong Speu and the people who would use this read
+   Khmer; some of the trade is with Thailand. So the interface is offered in
+   Khmer and Thai as well as English.
+
+   Translations are keyed by the English text rather than by an invented
+   symbol. That means a phrase with no translation yet comes out in English
+   rather than as "screen.storage.title", and adding one is a single line
+   next to the sentence it replaces. It also means the dictionary below is
+   its own coverage report: everything not in it is still English.
+
+   What is deliberately not translated: storage codes, batch numbers and the
+   check codes on a refusal. Those are identifiers people read out to each
+   other and type into other systems, and translating an identifier makes it
+   a different identifier.
+   ====================================================================== */
+const LANGS = { en: "English", km: "ខ្មែរ", th: "ไทย" };
+
+const DICT = {
+  km: {
+    // --- shell and navigation
+    "Sugar Production Planning": "ការគ្រោងផលិតកម្មស្ករ",
+    "Kampong Speu Sugar · KSS-F1": "ស្ករកំពង់ស្ពឺ · KSS-F1",
+    "Storage today": "ស្តុកផ្ទុកថ្ងៃនេះ",
+    "Storage master data": "ទិន្នន័យមេនៃទីតាំងផ្ទុក",
+    "Post a movement": "កត់ត្រាចលនាស្តុក",
+    "Actual against plan": "ជាក់ស្តែងធៀបនឹងផែនការ",
+    "Movement history": "ប្រវត្តិចលនាស្តុក",
+    "Daily production plan": "ផែនការផលិតកម្មប្រចាំថ្ងៃ",
+    "Users": "អ្នកប្រើប្រាស់",
+    "Change password": "ប្តូរពាក្យសម្ងាត់",
+    "Reset demo data": "កំណត់ទិន្នន័យសាកល្បងឡើងវិញ",
+    "Sign out": "ចាកចេញ",
+    "Not for your roles": "មិនស្ថិតក្នុងតួនាទីរបស់អ្នក",
+
+    // --- sign in
+    "Sign in": "ចូលប្រើ",
+    "User name": "ឈ្មោះអ្នកប្រើ",
+    "Password": "ពាក្យសម្ងាត់",
+    "or pick an account below": "ឬជ្រើសរើសគណនីខាងក្រោម",
+    "Kampong Speu Sugar Co., Ltd.": "ក្រុមហ៊ុនស្ករកំពង់ស្ពឺ",
+    "Storage, capacity and the 2026/27 season plan":
+      "ការផ្ទុក សមត្ថភាពផ្ទុក និងផែនការរដូវកាល ២០២៦/២៧",
+    "the user name or password is not correct": "ឈ្មោះអ្នកប្រើ ឬពាក្យសម្ងាត់មិនត្រឹមត្រូវ",
+    "enter a user name and password": "សូមបញ្ចូលឈ្មោះអ្នកប្រើ និងពាក្យសម្ងាត់",
+
+    // --- roles
+    "everything, including user administration": "គ្រប់យ៉ាង រួមទាំងការគ្រប់គ្រងអ្នកប្រើ",
+    "master data and the plan": "ទិន្នន័យមេ និងផែនការ",
+    "posting stock movements": "ការកត់ត្រាចលនាស្តុក",
+    "read only": "អានតែប៉ុណ្ណោះ",
+    "Everything, including creating and deactivating accounts.":
+      "គ្រប់យ៉ាង រួមទាំងការបង្កើត និងបិទគណនី។",
+    "Maintains storage master data and capacities. Cannot post stock.":
+      "ថែទាំទិន្នន័យមេ និងសមត្ថភាពផ្ទុក។ មិនអាចកត់ត្រាស្តុកបានទេ។",
+    "Posts receipts and issues. Cannot change master data.":
+      "កត់ត្រាការទទួល និងការចេញ។ មិនអាចកែទិន្នន័យមេបានទេ។",
+    "Both of the above, which is how a shift supervisor usually works.":
+      "ទាំងពីរខាងលើ ដែលជាវិធីធ្វើការធម្មតារបស់ប្រធានវេន។",
+    "Reads everything, changes nothing.": "អានបានគ្រប់យ៉ាង ប៉ុន្តែមិនកែអ្វីទាំងអស់។",
+
+    // --- common controls
+    "Save": "រក្សាទុក", "Cancel": "បោះបង់", "Edit": "កែសម្រួល", "Post": "កត់ត្រា",
+    "Reverse": "បញ្ច្រាស", "Enter movement": "បញ្ចូលចលនាស្តុក", "New user": "អ្នកប្រើថ្មី",
+    "Check capacity": "ពិនិត្យសមត្ថភាពផ្ទុក", "Fill it to bursting": "ដាក់ឲ្យលើសសមត្ថភាព",
+    "Deactivate": "បិទដំណើរការ", "Reactivate": "បើកដំណើរការឡើងវិញ",
+    "Day before": "ថ្ងៃមុន", "Day after": "ថ្ងៃបន្ទាប់",
+    "Record this day's actual production": "កត់ត្រាផលិតកម្មជាក់ស្តែងថ្ងៃនេះ",
+
+    // --- table headings and fields
+    "Code": "លេខកូដ", "Name": "ឈ្មោះ", "Type": "ប្រភេទ", "Status": "ស្ថានភាព",
+    "Remark": "សម្គាល់", "Products": "ផលិតផល", "Product": "ផលិតផល",
+    "Location": "ទីតាំង", "Storage location": "ទីតាំងផ្ទុក", "Scope": "វិសាលភាព",
+    "Packaging": "វេចខ្ចប់", "Pack": "វេចខ្ចប់", "Batch": "លេខបាច់",
+    "Date": "កាលបរិច្ឆេទ", "Day": "ថ្ងៃ", "Month": "ខែ", "Line": "ធាតុ",
+    "Quantity": "បរិមាណ", "Measured in": "គិតជា", "Tons": "តោន", "Packages": "កញ្ចប់",
+    "Capacity (t)": "សមត្ថភាពផ្ទុក (តោន)", "Capacity": "សមត្ថភាពផ្ទុក", "Safe": "សុវត្ថិភាព",
+    "Weight (t)": "ទម្ងន់ (តោន)", "Planned (t)": "ផែនការ (តោន)", "Actual (t)": "ជាក់ស្តែង (តោន)",
+    "Variance": "គម្លាត", "Opening": "សមតុល្យដើម", "Plan in": "ផែនការចូល",
+    "Actual in": "ចូលជាក់ស្តែង", "Plan out": "ផែនការចេញ", "Actual out": "ចេញជាក់ស្តែង",
+    "Plan closing": "ផែនការសមតុល្យចុង", "Actual closing": "សមតុល្យចុងជាក់ស្តែង",
+    "Now": "ឥឡូវ", "By": "ដោយ", "Reference": "ឯកសារយោង",
+    "Reference document": "ឯកសារយោង", "Note": "កំណត់ចំណាំ", "Why": "មូលហេតុ",
+    "Roles": "តួនាទី", "Seeded": "បញ្ចូលស្រាប់", "Last signed in": "ចូលចុងក្រោយ",
+    "Action": "សកម្មភាព", "Max packages": "កញ្ចប់អតិបរមា", "Max weight": "ទម្ងន់អតិបរមា",
+    "Movement type": "ប្រភេទចលនា", "Cane": "អំពៅ", "Raw sugar": "ស្ករឆៅ",
+    "To remelt": "ទៅរំលាយឡើងវិញ", "Jumbo packing": "វេចខ្ចប់ជុំបូ",
+    "Refined": "ស្ករចម្រាញ់", "White": "ស្ករស", "Super refined": "ស្ករចម្រាញ់ពិសេស",
+    "Quota sales": "លក់តាមកូតា", "Physical capacity (t)": "សមត្ថភាពផ្ទុកពិត (តោន)",
+    "Safe capacity (%)": "សមត្ថភាពសុវត្ថិភាព (%)", "Current password": "ពាក្យសម្ងាត់បច្ចុប្បន្ន",
+    "New password": "ពាក្យសម្ងាត់ថ្មី", "New password again": "បញ្ជាក់ពាក្យសម្ងាត់ថ្មី",
+
+    // --- values and states
+    "Normal": "ធម្មតា", "Warning": "ប្រុងប្រយ័ត្ន", "High": "ខ្ពស់",
+    "Critical": "គ្រោះថ្នាក់", "Full": "ពេញ",
+    "Active": "ដំណើរការ", "Inactive": "មិនដំណើរការ", "Deactivated": "បានបិទ",
+    "on plan": "ត្រូវតាមផែនការ", "changed": "បានកែ", "override": "សម្រេចលើស",
+    "demo": "សាកល្បង", "you": "អ្នក", "yes": "បាទ/ចាស", "no": "ទេ",
+    "never": "មិនដែល", "empty": "ទទេ", "mixed": "ច្រើនប្រភេទ", "single": "តែមួយប្រភេទ",
+    "not derivable": "មិនអាចទាញយកបាន", "Cleaning day": "ថ្ងៃសម្អាត",
+    "Molasses": "ម៉ូឡាស", "Refined Sugar": "ស្ករចម្រាញ់", "White Sugar": "ស្ករស",
+    "Super Refined Sugar": "ស្ករចម្រាញ់ពិសេស", "Raw Sugar": "ស្ករឆៅ",
+    "Refused.": "បដិសេធ។", "Nothing changed.": "គ្មានការផ្លាស់ប្តូរ។",
+
+    // --- the rules a refusal names
+    "Over physical capacity": "លើសសមត្ថភាពផ្ទុកពិត",
+    "Over the product limit": "លើសកម្រិតកំណត់ផលិតផល",
+    "Over the package limit": "លើសកម្រិតកំណត់កញ្ចប់",
+    "Above the safe level": "លើសកម្រិតសុវត្ថិភាព",
+    "Product not allowed here": "ផលិតផលនេះមិនអនុញ្ញាតទីនេះ",
+    "Mixed products not allowed": "មិនអនុញ្ញាតលាយផលិតផល",
+    "Not enough stock": "ស្តុកមិនគ្រប់គ្រាន់",
+    "Nothing blocks it": "គ្មានអ្វីរារាំង",
+    "Posted.": "បានកត់ត្រា។",
+    "Nothing was written. ": "គ្មានអ្វីត្រូវបានសរសេរ។ ",
+    "Change the quantity or the location, or tick the override and give a reason.": "សូមប្តូរបរិមាណ ឬទីតាំង ឬគូសសម្រេចលើស ហើយបញ្ជាក់មូលហេតុ។",
+    "Storage": "ការផ្ទុក",
+    "Production": "ផលិតកម្ម",
+    "Locations": "ទីតាំងផ្ទុក",
+    "Not in use": "មិនប្រើ",
+    "Where the actual comes from": "ប្រភពនៃតួលេខជាក់ស្តែង",
+    "The movements this day is made of": "ចលនាស្តុកដែលបង្កើតជាថ្ងៃនេះ",
+    "Pools the plan is written against": "អាងផ្ទុកដែលផែនការសរសេរតាម",
+    "What the plan needs, against what exists": "អ្វីដែលផែនការត្រូវការ ធៀបនឹងអ្វីដែលមាន",
+    "Capacity per product and packaging": "សមត្ថភាពផ្ទុកតាមផលិតផល និងវេចខ្ចប់",
+    "What each role may do": "អ្វីដែលតួនាទីនីមួយៗអាចធ្វើបាន",
+    "Change storage master data": "កែទិន្នន័យមេនៃទីតាំងផ្ទុក",
+    "Post stock movements": "កត់ត្រាចលនាស្តុក",
+    "Administer users": "គ្រប់គ្រងអ្នកប្រើ",
+    "Read everything": "អានបានគ្រប់យ៉ាង",
+    "Reason for overriding the block": "មូលហេតុនៃការសម្រេចលើស",
+    "Post it even if the capacity rules refuse it": "កត់ត្រាទោះបីច្បាប់សមត្ថភាពផ្ទុកបដិសេធក៏ដោយ",
+    "Reason, if you override": "មូលហេតុ បើអ្នកសម្រេចលើស",
+    "Language": "ភាសា",
+    "Cane crushed": "អំពៅកិន",
+    "Raw sugar made": "ស្ករឆៅផលិតបាន",
+    "Raw sugar to remelt": "ស្ករឆៅទៅរំលាយឡើងវិញ",
+    "Jumbo bagging out of the warehouse": "វេចខ្ចប់ជុំបូចេញពីឃ្លាំង",
+    "Refined sugar packed": "ស្ករចម្រាញ់វេចខ្ចប់",
+    "White sugar packed": "ស្ករសវេចខ្ចប់",
+    "Super refined packed": "ស្ករចម្រាញ់ពិសេសវេចខ្ចប់",
+    "Quota sales delivered": "ការលក់តាមកូតាបានប្រគល់",
+    "Production Receipt": "ការទទួលពីផលិតកម្ម",
+    "Packing Receipt": "ការទទួលពីវេចខ្ចប់",
+    "Stock Transfer In": "ការផ្ទេរចូល",
+    "Tank Receipt": "ការទទួលចូលធុង",
+    "Warehouse Receipt": "ការទទួលចូលឃ្លាំង",
+    "Customer Return": "ការសងត្រឡប់ពីអតិថិជន",
+    "Stock Transfer Out": "ការផ្ទេរចេញ",
+    "Sales / Quota Delivery": "ការលក់ / ប្រគល់តាមកូតា",
+    "Issue to Remelt": "ចេញទៅរំលាយឡើងវិញ",
+    "Release to Packing": "ចេញទៅវេចខ្ចប់",
+    "Process Loss": "ការបាត់បង់ក្នុងដំណើរការ",
+    "Stock Adjustment": "ការកែតម្រូវស្តុក",
+    "Day before": "ថ្ងៃមុន",
+    "Day after": "ថ្ងៃបន្ទាប់",
+    "Bulk / Unpacked": "ដុំ / មិនវេចខ្ចប់",
+    "Interface translated. The longer explanations stay in English.": "ផ្ទាំងប្រើប្រាស់បានបកប្រែ។ ការពន្យល់វែងនៅជាភាសាអង់គ្លេស។",
+  },
+
+  th: {
+    "Sugar Production Planning": "การวางแผนการผลิตน้ำตาล",
+    "Kampong Speu Sugar · KSS-F1": "น้ำตาลกำปงสปือ · KSS-F1",
+    "Storage today": "สต็อกวันนี้",
+    "Storage master data": "ข้อมูลหลักของที่จัดเก็บ",
+    "Post a movement": "บันทึกการเคลื่อนไหวสต็อก",
+    "Actual against plan": "จริงเทียบกับแผน",
+    "Movement history": "ประวัติการเคลื่อนไหว",
+    "Daily production plan": "แผนการผลิตรายวัน",
+    "Users": "ผู้ใช้",
+    "Change password": "เปลี่ยนรหัสผ่าน",
+    "Reset demo data": "รีเซ็ตข้อมูลตัวอย่าง",
+    "Sign out": "ออกจากระบบ",
+    "Not for your roles": "ไม่อยู่ในสิทธิ์ของคุณ",
+
+    "Sign in": "เข้าสู่ระบบ",
+    "User name": "ชื่อผู้ใช้",
+    "Password": "รหัสผ่าน",
+    "or pick an account below": "หรือเลือกบัญชีด้านล่าง",
+    "Kampong Speu Sugar Co., Ltd.": "บริษัท น้ำตาลกำปงสปือ จำกัด",
+    "Storage, capacity and the 2026/27 season plan":
+      "ที่จัดเก็บ ความจุ และแผนฤดูการผลิต 2026/27",
+    "the user name or password is not correct": "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง",
+    "enter a user name and password": "กรุณากรอกชื่อผู้ใช้และรหัสผ่าน",
+
+    "everything, including user administration": "ทุกอย่าง รวมถึงการจัดการผู้ใช้",
+    "master data and the plan": "ข้อมูลหลักและแผน",
+    "posting stock movements": "การบันทึกการเคลื่อนไหวสต็อก",
+    "read only": "อ่านอย่างเดียว",
+    "Everything, including creating and deactivating accounts.":
+      "ทุกอย่าง รวมถึงการสร้างและปิดบัญชี",
+    "Maintains storage master data and capacities. Cannot post stock.":
+      "ดูแลข้อมูลหลักและความจุที่จัดเก็บ บันทึกสต็อกไม่ได้",
+    "Posts receipts and issues. Cannot change master data.":
+      "บันทึกการรับและการจ่าย แก้ข้อมูลหลักไม่ได้",
+    "Both of the above, which is how a shift supervisor usually works.":
+      "ทั้งสองอย่างข้างต้น ซึ่งเป็นวิธีทำงานปกติของหัวหน้ากะ",
+    "Reads everything, changes nothing.": "อ่านได้ทุกอย่าง แต่แก้ไขไม่ได้",
+
+    "Save": "บันทึก", "Cancel": "ยกเลิก", "Edit": "แก้ไข", "Post": "บันทึก",
+    "Reverse": "กลับรายการ", "Enter movement": "ป้อนการเคลื่อนไหว", "New user": "ผู้ใช้ใหม่",
+    "Check capacity": "ตรวจความจุ", "Fill it to bursting": "ใส่จนล้นความจุ",
+    "Deactivate": "ปิดใช้งาน", "Reactivate": "เปิดใช้งานอีกครั้ง",
+    "Day before": "วันก่อนหน้า", "Day after": "วันถัดไป",
+    "Record this day's actual production": "บันทึกผลผลิตจริงของวันนี้",
+
+    "Code": "รหัส", "Name": "ชื่อ", "Type": "ประเภท", "Status": "สถานะ",
+    "Remark": "หมายเหตุ", "Products": "สินค้า", "Product": "สินค้า",
+    "Location": "ที่ตั้ง", "Storage location": "ที่จัดเก็บ", "Scope": "ขอบเขต",
+    "Packaging": "บรรจุภัณฑ์", "Pack": "บรรจุ", "Batch": "ล็อต",
+    "Date": "วันที่", "Day": "วัน", "Month": "เดือน", "Line": "รายการ",
+    "Quantity": "จำนวน", "Measured in": "หน่วยวัด", "Tons": "ตัน", "Packages": "กระสอบ",
+    "Capacity (t)": "ความจุ (ตัน)", "Capacity": "ความจุ", "Safe": "ปลอดภัย",
+    "Weight (t)": "น้ำหนัก (ตัน)", "Planned (t)": "ตามแผน (ตัน)", "Actual (t)": "จริง (ตัน)",
+    "Variance": "ผลต่าง", "Opening": "ยอดยกมา", "Plan in": "แผนรับเข้า",
+    "Actual in": "รับเข้าจริง", "Plan out": "แผนจ่ายออก", "Actual out": "จ่ายออกจริง",
+    "Plan closing": "แผนยอดคงเหลือ", "Actual closing": "ยอดคงเหลือจริง",
+    "Now": "ตอนนี้", "By": "โดย", "Reference": "เอกสารอ้างอิง",
+    "Reference document": "เอกสารอ้างอิง", "Note": "บันทึกย่อ", "Why": "เหตุผล",
+    "Roles": "สิทธิ์", "Seeded": "ข้อมูลตั้งต้น", "Last signed in": "เข้าระบบล่าสุด",
+    "Action": "การกระทำ", "Max packages": "กระสอบสูงสุด", "Max weight": "น้ำหนักสูงสุด",
+    "Movement type": "ประเภทการเคลื่อนไหว", "Cane": "อ้อย", "Raw sugar": "น้ำตาลดิบ",
+    "To remelt": "ส่งหลอมใหม่", "Jumbo packing": "บรรจุถุงจัมโบ้",
+    "Refined": "น้ำตาลรีไฟน์", "White": "น้ำตาลทรายขาว", "Super refined": "น้ำตาลรีไฟน์พิเศษ",
+    "Quota sales": "ขายตามโควตา", "Physical capacity (t)": "ความจุจริง (ตัน)",
+    "Safe capacity (%)": "ความจุปลอดภัย (%)", "Current password": "รหัสผ่านปัจจุบัน",
+    "New password": "รหัสผ่านใหม่", "New password again": "ยืนยันรหัสผ่านใหม่",
+
+    "Normal": "ปกติ", "Warning": "เฝ้าระวัง", "High": "สูง",
+    "Critical": "วิกฤต", "Full": "เต็ม",
+    "Active": "ใช้งาน", "Inactive": "ไม่ใช้งาน", "Deactivated": "ปิดใช้งานแล้ว",
+    "on plan": "ตรงตามแผน", "changed": "แก้ไขแล้ว", "override": "ข้ามการตรวจ",
+    "demo": "ตัวอย่าง", "you": "คุณ", "yes": "ใช่", "no": "ไม่",
+    "never": "ไม่เคย", "empty": "ว่าง", "mixed": "หลายชนิด", "single": "ชนิดเดียว",
+    "not derivable": "หาค่าไม่ได้", "Cleaning day": "วันล้างเครื่อง",
+    "Molasses": "กากน้ำตาล", "Refined Sugar": "น้ำตาลรีไฟน์", "White Sugar": "น้ำตาลทรายขาว",
+    "Super Refined Sugar": "น้ำตาลรีไฟน์พิเศษ", "Raw Sugar": "น้ำตาลดิบ",
+    "Refused.": "ถูกปฏิเสธ", "Nothing changed.": "ไม่มีการเปลี่ยนแปลง",
+
+    "Over physical capacity": "เกินความจุจริง",
+    "Over the product limit": "เกินขีดจำกัดของสินค้า",
+    "Over the package limit": "เกินขีดจำกัดจำนวนกระสอบ",
+    "Above the safe level": "เกินระดับปลอดภัย",
+    "Product not allowed here": "ไม่อนุญาตสินค้านี้ที่นี่",
+    "Mixed products not allowed": "ไม่อนุญาตให้ปนสินค้า",
+    "Not enough stock": "สต็อกไม่พอ",
+    "Nothing blocks it": "ไม่มีอะไรขัดขวาง",
+    "Posted.": "บันทึกแล้ว",
+    "Nothing was written. ": "ไม่มีการบันทึกใด ๆ ",
+    "Change the quantity or the location, or tick the override and give a reason.": "เปลี่ยนจำนวนหรือที่จัดเก็บ หรือติ๊กข้ามการตรวจแล้วระบุเหตุผล",
+    "Storage": "ที่จัดเก็บ",
+    "Production": "การผลิต",
+    "Locations": "ที่จัดเก็บทั้งหมด",
+    "Not in use": "ไม่ได้ใช้งาน",
+    "Where the actual comes from": "ที่มาของตัวเลขจริง",
+    "The movements this day is made of": "การเคลื่อนไหวที่ประกอบเป็นวันนี้",
+    "Pools the plan is written against": "กลุ่มคลังที่แผนอ้างอิง",
+    "What the plan needs, against what exists": "สิ่งที่แผนต้องการ เทียบกับสิ่งที่มี",
+    "Capacity per product and packaging": "ความจุตามสินค้าและบรรจุภัณฑ์",
+    "What each role may do": "สิ่งที่แต่ละสิทธิ์ทำได้",
+    "Change storage master data": "แก้ข้อมูลหลักของที่จัดเก็บ",
+    "Post stock movements": "บันทึกการเคลื่อนไหวสต็อก",
+    "Administer users": "จัดการผู้ใช้",
+    "Read everything": "อ่านได้ทุกอย่าง",
+    "Reason for overriding the block": "เหตุผลในการข้ามการตรวจ",
+    "Post it even if the capacity rules refuse it": "บันทึกแม้กฎความจุจะปฏิเสธ",
+    "Reason, if you override": "เหตุผล หากข้ามการตรวจ",
+    "Language": "ภาษา",
+    "Cane crushed": "อ้อยที่หีบ",
+    "Raw sugar made": "น้ำตาลดิบที่ผลิตได้",
+    "Raw sugar to remelt": "น้ำตาลดิบส่งหลอมใหม่",
+    "Jumbo bagging out of the warehouse": "บรรจุถุงจัมโบ้ออกจากคลัง",
+    "Refined sugar packed": "น้ำตาลรีไฟน์ที่บรรจุ",
+    "White sugar packed": "น้ำตาลทรายขาวที่บรรจุ",
+    "Super refined packed": "น้ำตาลรีไฟน์พิเศษที่บรรจุ",
+    "Quota sales delivered": "ส่งมอบขายตามโควตา",
+    "Production Receipt": "รับจากการผลิต",
+    "Packing Receipt": "รับจากการบรรจุ",
+    "Stock Transfer In": "โอนเข้า",
+    "Tank Receipt": "รับเข้าถัง",
+    "Warehouse Receipt": "รับเข้าคลัง",
+    "Customer Return": "รับคืนจากลูกค้า",
+    "Stock Transfer Out": "โอนออก",
+    "Sales / Quota Delivery": "ขาย / ส่งมอบตามโควตา",
+    "Issue to Remelt": "จ่ายไปหลอมใหม่",
+    "Release to Packing": "จ่ายไปบรรจุ",
+    "Process Loss": "การสูญเสียในกระบวนการ",
+    "Stock Adjustment": "ปรับปรุงสต็อก",
+    "Day before": "วันก่อนหน้า",
+    "Day after": "วันถัดไป",
+    "Bulk / Unpacked": "แบบเท / ไม่บรรจุ",
+    "Interface translated. The longer explanations stay in English.": "แปลส่วนติดต่อผู้ใช้แล้ว คำอธิบายยาวยังเป็นภาษาอังกฤษ",
+  },
+};
+
+/** The rule a refusal names, in words rather than as a code. */
+const CHECK_NAMES = {
+  PHYSICAL_CAPACITY: "Over physical capacity",
+  PRODUCT_CAPACITY: "Over the product limit",
+  PACKAGE_CAPACITY: "Over the package limit",
+  SAFE_CAPACITY: "Above the safe level",
+  PRODUCT_ALLOWED: "Product not allowed here",
+  MIXED_PRODUCTS: "Mixed products not allowed",
+  MINIMUM_STOCK: "Not enough stock",
+};
+
+let LANG = "en";
+try { LANG = localStorage.getItem(LANG_KEY) || "en"; } catch (e) { /* private mode */ }
+if (!LANGS[LANG]) LANG = "en";
+
+function t(text) {
+  const d = DICT[LANG];
+  return (d && d[text]) || text;
+}
+
+/**
+ * Replace the English in a rendered subtree with the chosen language.
+ *
+ * Done after rendering rather than at every call site. The alternative —
+ * wrapping several hundred strings by hand — is the same work spread over
+ * every screen, where a missed one is invisible until somebody who does not
+ * read English finds it. Here, anything without a translation simply stays
+ * in English, which is the right failure.
+ *
+ * Only whole text nodes are matched, so a sentence is translated as a
+ * sentence and a number in the middle of one is never touched.
+ */
+const ORIGINALS = new WeakMap();
+
+function localise(root) {
+  if (!root) return;
+  const dict = DICT[LANG] || {};
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  for (const node of nodes) {
+    // Always translate from the English the node was built with, never from
+    // whatever it says now. Parts of the page — the buttons in the rail — are
+    // written once and never re-rendered, so translating in place would leave
+    // them stuck in the first language somebody picked: Khmer text is not a
+    // key in the Thai dictionary, so the second switch would find nothing to
+    // replace and quietly do nothing.
+    let base = ORIGINALS.get(node);
+    if (base === undefined) {
+      base = node.nodeValue;
+      ORIGINALS.set(node, base);
+    }
+    const trimmed = base.trim();
+    if (!trimmed) continue;
+    const hit = dict[trimmed];
+    const next = hit ? base.replace(trimmed, hit) : base;
+    if (node.nodeValue !== next) node.nodeValue = next;
+  }
+  for (const el of root.querySelectorAll("[placeholder]")) {
+    if (!el.dataset.ph) el.dataset.ph = el.getAttribute("placeholder");
+    el.setAttribute("placeholder", dict[el.dataset.ph.trim()] || el.dataset.ph);
+  }
+}
+
+function setLanguage(code) {
+  if (!LANGS[code]) return;
+  LANG = code;
+  try { localStorage.setItem(LANG_KEY, code); } catch (e) { /* private mode */ }
+  document.documentElement.setAttribute("lang", code);
+  renderLangPickers();
+  if (document.getElementById("app").hidden) { showLogin(); } else { route(); }
+}
+
+function langPickerHtml() {
+  return `<div class="langpick" role="group" aria-label="Language">
+    ${Object.entries(LANGS).map(([code, name]) =>
+      `<button type="button" data-lang="${code}" aria-pressed="${code === LANG}" lang="${code}">${name}</button>`).join("")}
+  </div>`;
+}
+
+function renderLangPickers() {
+  for (const host of document.querySelectorAll("[data-langhost]")) {
+    host.innerHTML = langPickerHtml() + (LANG === "en" ? "" :
+      `<div class="note" style="font-size:.72rem;margin-top:.35rem">${esc(t("Interface translated. The longer explanations stay in English."))}</div>`);
+    host.querySelectorAll("[data-lang]").forEach(b =>
+      b.addEventListener("click", () => setLanguage(b.dataset.lang)));
+  }
+}
 
 /* --- roles ---------------------------------------------------------------
    The same four roles the real system has, and the same rules about what
@@ -826,6 +1245,74 @@ function prepare(req) {
 
 function validateMovement(req) { return prepare(req).out; }
 
+/**
+ * Reverse a posted movement by writing its opposite.
+ *
+ * Nothing is deleted or edited. A movement that was posted is a statement
+ * about what happened, and the way to correct a wrong statement is another
+ * statement that says so — which is why both lines stay in the ledger, each
+ * naming the other. It is also the only way the day's actual figure can go
+ * down, since those figures are added up from movements.
+ *
+ * The reversal is checked like any other posting: putting stock back has to
+ * fit, and taking it out again has to be there.
+ */
+function reverseMovement(id, reason) {
+  const original = db.movements.find(m => m.id === id);
+  if (!original) throw new Error(`there is no movement #${id}`);
+  if (original.reversalOf) throw new Error(`#${id} is itself a reversal; reverse the original instead`);
+  if (original.reversedBy) throw new Error(`#${id} was already reversed by #${original.reversedBy}`);
+  if (!reason) throw new Error("a reversal needs a reason — it is the only record of why");
+
+  const loc = findLocation(original.loc);
+  const product = productOf[original.product];
+  const packaging = packagingOf[original.packaging];
+  const qty = { packages: Math.abs(original.packages), weight: Math.abs(original.weight) };
+
+  // The reversal moves stock the other way, so it is checked the other way.
+  let validation;
+  if (original.weight > 0) {
+    const cur = productStock(loc.code, product.code, packaging.code);
+    validation = { allowed: true, requiresOverride: false, findings: [] };
+    if (qty.weight > cur.weight + EPS) {
+      validation = { allowed: false, requiresOverride: true, findings: [{
+        check: "MINIMUM_STOCK", severity: "BLOCK", uom: loc.uom,
+        message: `${loc.name} holds ${num(cur.weight)} ${loc.uom} of ${product.name} in ${packaging.code}, less than the ${num(qty.weight)} this reversal would take back out`,
+        limit: round(cur.weight, 3), projected: round(qty.weight, 3),
+        excess: round(qty.weight - cur.weight, 3) }] };
+    }
+  } else {
+    validation = validate(loc, product, packaging, qty);
+  }
+  if (!validation.allowed) {
+    const err = new Error(validation.findings.filter(f => f.severity === "BLOCK")
+      .map(f => f.message).join("; "));
+    err.validation = validation;
+    throw err;
+  }
+
+  const sign = original.weight > 0 ? -1 : 1;
+  const key = balanceKey(loc.code, product.code, packaging.code, original.batch);
+  const cur = db.balances[key] || { packages: 0, weight: 0 };
+  db.balances[key] = {
+    packages: cur.packages + sign * qty.packages,
+    weight: cur.weight + sign * qty.weight,
+  };
+
+  const reversal = {
+    id: db.seq++, date: original.date, type: original.type, typeName: original.typeName,
+    direction: original.direction, loc: original.loc, product: original.product,
+    packaging: original.packaging, batch: original.batch,
+    packages: sign * qty.packages, weight: sign * qty.weight,
+    ref: original.ref, remark: reason, by: (currentUser() || {}).username || "anonymous",
+    override: false, overrideReason: "", reversalOf: original.id,
+  };
+  db.movements.push(reversal);
+  original.reversedBy = reversal.id;
+  save();
+  return reversal;
+}
+
 function postMovement(req) {
   const { loc, product, packaging, mt, out } = prepare(req);
 
@@ -1018,10 +1505,52 @@ function renderNav(active) {
   document.getElementById("whoname").textContent = user ? user.username : "";
   document.getElementById("whoroles").innerHTML = user
     ? user.roles.map(r => `<i>${esc(r)}</i>`).join("") : "";
+  localise(document.getElementById("rail"));
 }
 
+/**
+ * A page's heading, its summary, and the paragraph explaining how it works.
+ *
+ * The summary is translated; the paragraph under it is not. That is a
+ * deliberate line rather than an unfinished job. The summary is what somebody
+ * needs to work — one sentence saying what this screen is for — and it is
+ * carried for every screen in every language. The paragraph is an argument
+ * about why the screen behaves as it does, aimed at whoever is deciding
+ * whether to adopt the system; the rest of that argument lives in the
+ * repository, in English, and a translation that drifts out of step with it
+ * would be worse than none. The interface says so rather than leaving people
+ * to wonder whether something failed to load.
+ */
+const SUMMARIES = {
+  km: {
+    "Storage today": "អ្វីដែលធុង ស៊ីឡូ និងឃ្លាំងនីមួយៗកំពុងផ្ទុក ធៀបនឹងអ្វីដែលវាអាចផ្ទុកបាន។",
+    "Storage master data": "សមត្ថភាពផ្ទុក កម្រិតសុវត្ថិភាព និងផលិតផលដែលអនុញ្ញាតនៅទីតាំងនីមួយៗ។ អ្វីៗទាំងអស់នេះកែបាន។",
+    "Post a movement": "រាល់ការទទួលចូលត្រូវពិនិត្យមុននឹងកត់ត្រា។ អ្នកគ្រប់គ្នាអាចពិនិត្យបាន ប៉ុន្តែការកត់ត្រាត្រូវការតួនាទីឃ្លាំង។",
+    "Actual against plan": "អ្វីដែលផែនការបានកំណត់សម្រាប់ថ្ងៃមួយ ធៀបនឹងអ្វីដែលចលនាស្តុកបានកត់ត្រា។ តួលេខជាក់ស្តែងទាំងអស់មកពីចលនាស្តុក មិនមែនវាយបញ្ចូលទេ។",
+    "Movement history": "រាល់បន្ទាត់ដែលប្រព័ន្ធបានសរសេរ ថ្មីបំផុតនៅលើគេ ព្រមទាំងឈ្មោះអ្នកសរសេរ។",
+    "Daily production plan": "សៀវភៅផែនការមួយថ្ងៃម្ដង ហើយកែបានមួយថ្ងៃម្ដង។ ការកែថ្ងៃមួយធ្វើឲ្យខ្សែកោងស្តុកផ្លាស់ប្តូរតាម។",
+    "Users": "គណនី និងអ្វីដែលគណនីនីមួយៗអាចធ្វើបាន។",
+    "Not for your roles": "ទំព័រនេះមាន ប៉ុន្តែតួនាទីរបស់អ្នកមិនអាចចូលបានទេ។",
+  },
+  th: {
+    "Storage today": "แต่ละถัง ไซโล และคลังสินค้ามีอะไรอยู่ เทียบกับความจุที่รับได้",
+    "Storage master data": "ความจุ ระดับปลอดภัย และสินค้าที่อนุญาตในแต่ละที่จัดเก็บ ทั้งหมดนี้แก้ไขได้",
+    "Post a movement": "ทุกการรับเข้าจะถูกตรวจก่อนบันทึก ทุกคนตรวจได้ แต่การบันทึกต้องมีสิทธิ์คลังสินค้า",
+    "Actual against plan": "แผนบอกอะไรไว้สำหรับวันนั้น เทียบกับที่การเคลื่อนไหวบันทึกไว้จริง ตัวเลขจริงทั้งหมดมาจากการเคลื่อนไหว ไม่ได้พิมพ์เข้าไป",
+    "Movement history": "ทุกบรรทัดที่ระบบบันทึกไว้ ใหม่สุดอยู่บน พร้อมชื่อผู้บันทึก",
+    "Daily production plan": "สมุดแผนงานทีละวัน และแก้ไขได้ทีละวัน การแก้วันหนึ่งจะทำให้เส้นสต็อกขยับตาม",
+    "Users": "บัญชีผู้ใช้ และสิ่งที่แต่ละบัญชีทำได้",
+    "Not for your roles": "หน้านี้มีอยู่ แต่สิทธิ์ของคุณเข้าไม่ถึง",
+  },
+};
+
 function head(title, blurb) {
-  return `<div class="head"><h1>${esc(title)}</h1><p>${blurb}</p></div>`;
+  const summary = LANG !== "en" && SUMMARIES[LANG] && SUMMARIES[LANG][title];
+  return `<div class="head"><h1>${esc(title)}</h1>
+    <div style="flex:1 1 22rem;min-width:0">
+      ${summary ? `<p style="color:var(--ink-2);font-size:.95rem;margin-bottom:.4rem">${esc(summary)}</p>` : ""}
+      <p${summary ? ' style="font-size:.82rem"' : ""}>${blurb}</p>
+    </div></div>`;
 }
 
 /* --- storage today -------------------------------------------------------- */
@@ -1313,6 +1842,29 @@ function renderMovement() {
   });
 }
 
+/**
+ * One rule's verdict.
+ *
+ * The rule's name is a phrase, so it translates; the sentence with the
+ * numbers in it stays in English, and the check code stays as it is. That
+ * split is deliberate. The name answers "which rule stopped me", which is
+ * what somebody needs in their own language and needs quickly. The sentence
+ * and the code are what they read out to whoever they ring about it, and are
+ * word for word what the server behind the real system says — translating
+ * those would leave two systems giving different answers to the same
+ * question.
+ */
+function findingHtml(f) {
+  const name = CHECK_NAMES[f.check] || f.check;
+  return `<div class="finding ${f.severity}">
+    <div style="margin-bottom:.15rem"><b>${esc(name)}</b></div>
+    ${esc(f.message)}
+    ${f.limit !== undefined
+      ? `<code>${esc(f.check)} · limit ${num(f.limit)} · projected ${num(f.projected)} · over by ${num(f.excess)} ${esc(f.uom)}</code>`
+      : `<code>${esc(f.check)}</code>`}
+  </div>`;
+}
+
 function movementRequest() {
   const axis = document.getElementById("m-axis").value;
   const qty = Number(document.getElementById("m-qty").value);
@@ -1355,17 +1907,17 @@ function runMovement(post) {
   const v = res.validation;
   overrideBox.hidden = v.allowed;
 
+  // The verdict is its own element so it translates as a phrase, with the
+  // quantities beside it rather than inside it.
   const banner = res.posted
-    ? `<div class="msg good">Posted as movement #${res.movementId} — ${num(Math.abs(res.quantity.weight))} t${res.quantity.packages ? " (" + num(res.quantity.packages) + " packages)" : ""}.</div>`
+    ? `<div class="msg good"><b>Posted.</b> <span class="num">#${res.movementId} · ${num(Math.abs(res.quantity.weight))} t${res.quantity.packages ? " · " + num(res.quantity.packages) + " pkg" : ""}</span></div>`
     : v.allowed
-      ? `<div class="msg good">Nothing blocks this. ${num(res.quantity.weight)} t${res.quantity.packages ? " · " + num(res.quantity.packages) + " packages" : ""}.</div>`
-      : `<div class="msg bad">Refused.${post ? " Nothing was written." : ""} Fix the quantity, or give a reason in the box above and post it as an override — the override and the reason go into the movement record.</div>`;
+      ? `<div class="msg good"><b>Nothing blocks it</b> <span class="num">${num(res.quantity.weight)} t${res.quantity.packages ? " · " + num(res.quantity.packages) + " pkg" : ""}</span></div>`
+      : `<div class="msg bad"><b>Refused.</b> <span>${post ? "Nothing was written. " : ""}Change the quantity or the location, or tick the override and give a reason.</span></div>`;
 
   box.innerHTML = banner + `<div class="findings" style="margin-top:.6rem">` +
-    v.findings.map(f => `<div class="finding ${f.severity}">
-      ${esc(f.message)}
-      ${f.limit !== undefined ? `<code>${esc(f.check)} · limit ${num(f.limit)} · projected ${num(f.projected)} · over by ${num(f.excess)} ${esc(f.uom)}</code>` : `<code>${esc(f.check)}</code>`}
-    </div>`).join("") + `</div>`;
+    v.findings.map(findingHtml).join("") + `</div>`;
+  localise(box);
 
   if (res.posted) { renderNav(currentPage()); }
 }
@@ -1411,19 +1963,25 @@ function scopeMembers(code) {
   return members.map(findLocation).filter(l => l && l.status === "ACTIVE");
 }
 
-/** What the movements say happened on one day, per production line. */
+/** What the movements say happened on one day, per production line.
+ *
+ *  Summed by direction rather than by magnitude, so a reversal subtracts.
+ *  Taking the absolute value would make correcting a mistake look like doing
+ *  the work twice.
+ */
 function actualProduction(date) {
   const out = {};
   for (const line of ACTUAL_LINES) {
     if (line.derivable === false) { out[line.key] = null; continue; }
     const codes = new Set(scopeMembers(line.scope).map(l => l.code));
+    const outward = movementTypeOf[line.movement].direction === "OUT";
     let total = 0;
     for (const m of db.movements) {
       if (m.date !== date) continue;
       if (m.type !== line.movement) continue;
       if (m.product !== line.product || m.packaging !== line.packaging) continue;
       if (!codes.has(m.loc)) continue;
-      total += Math.abs(m.weight);
+      total += outward ? -m.weight : m.weight;
     }
     out[line.key] = total;
   }
@@ -1470,7 +2028,14 @@ function renderActual() {
       ${varianceCell(planned, actual)}
       <td class="wrap">${line.derivable === false
         ? esc(line.why)
-        : `${esc(movementTypeOf[line.movement].name)} of ${esc(productOf[line.product].name)} in ${esc(line.packaging.replace("PKG-", ""))}`}</td>
+        // Three separate parts rather than one sentence, so each translates on
+        // its own — a sentence assembled from three names is not a phrase any
+        // dictionary can hold.
+        : `<span>${esc(movementTypeOf[line.movement].name)}</span> ·
+           <span>${esc(productOf[line.product].name)}</span> ·
+           <span class="num">${esc(line.packaging.replace("PKG-", ""))}</span>`}</td>
+      <td>${line.derivable === false ? ""
+        : `<button class="btn small" data-enter="${esc(line.key)}"${mayPost ? "" : " disabled"}>Enter movement</button>`}</td>
     </tr>`;
   }).join("");
 
@@ -1512,8 +2077,8 @@ function renderActual() {
         <label class="field"><span>Day</span><select id="ac-date">
           ${dates.map(d => `<option value="${d}"${d === chosen ? " selected" : ""}>${human(d)}${d === SEED_DATE ? " — the seeded day" : ""}</option>`).join("")}
         </select></label>
-        <button class="btn" id="ac-prev" type="button">&larr; Day before</button>
-        <button class="btn" id="ac-next" type="button">Day after &rarr;</button>
+        <button class="btn" id="ac-prev" type="button"><span aria-hidden="true">&larr;</span> <span>Day before</span></button>
+        <button class="btn" id="ac-next" type="button"><span>Day after</span> <span aria-hidden="true">&rarr;</span></button>
         <button class="btn primary" id="ac-record" type="button"${mayPost ? "" : " disabled"}>Record this day's actual production</button>
         <span class="spacer"></span>
         <span class="note">${posted.length} movement${posted.length === 1 ? "" : "s"} posted on this day</span>
@@ -1528,7 +2093,7 @@ function renderActual() {
       <h2 style="margin:.2rem 0 .7rem">Production</h2>
       <div class="tablewrap"><table>
         <thead><tr><th>Line</th><th class="n">Planned (t)</th><th class="n">Actual (t)</th>
-          <th>Variance</th><th>Where the actual comes from</th></tr></thead>
+          <th>Variance</th><th>Where the actual comes from</th><th></th></tr></thead>
         <tbody>${productionRows}</tbody></table></div>
 
       <h2 style="margin:1.6rem 0 .7rem">Storage</h2>
@@ -1545,31 +2110,143 @@ function renderActual() {
         <tbody>${storageRows}</tbody></table></div>
 
       <h2 style="margin:1.6rem 0 .7rem">The movements this day is made of</h2>
+      <p class="note" style="max-width:80ch;margin-bottom:.7rem">
+        A posted movement is a statement about what happened, so nothing here is edited or
+        deleted. A wrong one is corrected by reversing it: both lines stay, each naming the
+        other, and the actual figures above go down by the reversed amount.</p>
       <div class="tablewrap"><table>
         <thead><tr><th>#</th><th>Type</th><th>Location</th><th>Product</th><th>Pack</th>
-          <th>Batch</th><th class="n">Weight (t)</th><th>By</th><th>Reference</th></tr></thead>
-        <tbody>${posted.length ? posted.map(m => `<tr>
+          <th>Batch</th><th class="n">Weight (t)</th><th>By</th><th>Reference</th><th></th></tr></thead>
+        <tbody>${posted.length ? posted.map(m => `<tr${m.reversalOf || m.reversedBy ? ' class="dim"' : ""}>
           <td class="num">#${m.id}</td><td>${esc(m.typeName)}</td><td class="num">${esc(m.loc)}</td>
           <td>${esc(productOf[m.product].name)}</td><td class="num">${esc(m.packaging.replace("PKG-", ""))}</td>
           <td class="num">${esc(m.batch || "—")}</td><td class="n">${num(m.weight)}</td>
-          <td class="num">${esc(m.by)}</td><td class="wrap">${esc(m.ref || m.remark || "")}</td></tr>`).join("")
-          : `<tr><td colspan="9">Nothing was posted on ${human(chosen)}, so every actual above is zero.
+          <td class="num">${esc(m.by)}</td>
+          <td class="wrap">${m.reversalOf ? `<span class="chip HIGH">reverses #${m.reversalOf}</span> ${esc(m.remark)}`
+            : m.reversedBy ? `<span class="chip off">reversed by #${m.reversedBy}</span>`
+            : esc(m.ref || m.remark || "")}</td>
+          <td>${m.reversalOf || m.reversedBy ? ""
+            : `<button class="btn small" data-reverse="${m.id}"${mayPost ? "" : " disabled"}>Reverse</button>`}</td>
+          </tr>`).join("")
+          : `<tr><td colspan="10">Nothing was posted on ${human(chosen)}, so every actual above is zero.
              That is not a fault — it is what an unreported day looks like.</td></tr>`}
         </tbody></table></div>`;
 
+  view.querySelectorAll("[data-enter]").forEach(b =>
+    b.addEventListener("click", () => enterMovement(chosen, b.dataset.enter)));
+  view.querySelectorAll("[data-reverse]").forEach(b =>
+    b.addEventListener("click", () => confirmReversal(Number(b.dataset.reverse))));
+
   document.getElementById("ac-date").addEventListener("change", e => {
     renderActual.date = e.target.value;
-    renderActual();
+    route();
   });
   const step = delta => {
     const i = dates.indexOf(chosen) + delta;
     if (i < 0 || i >= dates.length) return;
     renderActual.date = dates[i];
-    renderActual();
+    route();
   };
   document.getElementById("ac-prev").addEventListener("click", () => step(-1));
   document.getElementById("ac-next").addEventListener("click", () => step(1));
   document.getElementById("ac-record").addEventListener("click", () => recordActuals(chosen));
+}
+
+/**
+ * Enter one movement against a production line.
+ *
+ * The whole-day dialog is convenient when a day went roughly to plan. This is
+ * the other case: one lorry, one shift, one correction — where somebody knows
+ * exactly which warehouse it went into and wants to say so rather than let a
+ * pooling rule decide.
+ */
+function enterMovement(date, lineKey) {
+  const line = ACTUAL_LINES.find(l => l.key === lineKey);
+  const type = movementTypeOf[line.movement];
+  const members = scopeMembers(line.scope);
+  const outward = type.direction === "OUT";
+  const per = packagingOf[line.packaging].weight_in_ton;
+
+  openDialog(`${line.label} on ${human(date)}`, `
+    <p class="note" style="margin:0">
+      ${esc(type.name)} of ${esc(productOf[line.product].name)} in
+      ${esc(packagingOf[line.packaging].description)}. ${outward
+        ? "Taken out of the location you pick, so it has to be there."
+        : "Put into the location you pick, so it has to fit."}
+    </p>
+    <label class="field"><span>Storage location</span><select id="em-loc">
+      ${members.map(l => {
+        const held = productStock(l.code, line.product, line.packaging);
+        return `<option value="${esc(l.code)}">${esc(l.code)} — ${esc(l.name)} · holds ${num(held.weight)} t</option>`;
+      }).join("")}
+    </select></label>
+    <div class="two">
+      <label class="field"><span>Quantity (${per > 0 ? "packages" : "tons"})</span>
+        <input id="em-qty" type="number" step="${per > 0 ? "1" : "0.001"}" min="0" value="${per > 0 ? 100 : 100}"></label>
+      <label class="field"><span>Batch</span>
+        <input id="em-batch" type="text" value="${esc(line.batch)}" spellcheck="false"></label>
+    </div>
+    ${per > 0 ? `<p class="note">One ${esc(line.packaging.replace("PKG-", ""))} is ${num(per)} t, so the weight follows from the count. Bags are whole; the system will not post a fraction of one.</p>` : ""}
+    <div class="two">
+      <label class="field"><span>Reference document</span>
+        <input id="em-ref" type="text" value="PROD-${date.replace(/-/g, "")}"></label>
+      <label class="field"><span>Remark</span><input id="em-remark" type="text"></label>
+    </div>
+    <label style="display:flex;gap:.5rem;align-items:baseline;font-size:.9rem">
+      <input id="em-override" type="checkbox" style="width:auto">
+      <span>Post it even if the capacity rules refuse it</span></label>
+    <label class="field"><span>Reason, if you override</span>
+      <input id="em-reason" type="text" placeholder="written into the movement, and read back later"></label>`,
+    () => {
+      requirePermission("postMovements");
+      const qty = Number(document.getElementById("em-qty").value);
+      if (!isFinite(qty) || qty <= 0) throw new Error("enter a quantity greater than zero");
+      const req = {
+        date, movementType: line.movement, storage: document.getElementById("em-loc").value,
+        product: line.product, packaging: line.packaging,
+        batch: document.getElementById("em-batch").value.trim(),
+        ref: document.getElementById("em-ref").value.trim(),
+        remark: document.getElementById("em-remark").value.trim(),
+        by: (currentUser() || {}).username || "anonymous",
+        override: document.getElementById("em-override").checked,
+        overrideReason: document.getElementById("em-reason").value.trim(),
+      };
+      if (per > 0) req.packages = qty; else req.weight = qty;
+
+      const res = postMovement(req);
+      if (!res.posted) {
+        // Left open with the reasons, rather than closed with a toast: the
+        // next thing to do is change one of the fields in front of you.
+        throw new Error(res.validation.findings.filter(f => f.severity === "BLOCK")
+          .map(f => f.message).join(" · ") +
+          " — change the quantity or the location, or tick the override and give a reason.");
+      }
+      route();
+      toast(`Movement #${res.movementId} posted — ${num(Math.abs(res.quantity.weight))} t.`);
+    });
+}
+
+/** Reverse a movement, after saying which one and what it will do. */
+function confirmReversal(id) {
+  const m = db.movements.find(x => x.id === id);
+  openDialog(`Reverse movement #${id}`, `
+    <p class="note" style="margin:0">
+      #${id} put ${num(m.weight)} t of ${esc(productOf[m.product].name)}
+      (${esc(m.packaging.replace("PKG-", ""))}${m.batch ? ", batch " + esc(m.batch) : ""})
+      ${m.weight > 0 ? "into" : "out of"} ${esc(findLocation(m.loc).name)} on ${human(m.date)},
+      posted by ${esc(m.by)}.
+    </p>
+    <p class="note">Reversing it writes the opposite movement. Both lines stay in the ledger
+      and each names the other, so the record shows that a correction was made rather than
+      hiding that anything was wrong.</p>
+    <label class="field"><span>Why</span>
+      <input id="rv-reason" type="text" placeholder="e.g. posted to the wrong warehouse"></label>`,
+    () => {
+      requirePermission("postMovements");
+      const reversal = reverseMovement(id, document.getElementById("rv-reason").value.trim());
+      route();
+      toast(`#${id} reversed by #${reversal.id}.`);
+    });
 }
 
 /**
@@ -1615,7 +2292,7 @@ function recordActuals(date) {
         const delta = wanted - (made[line.key] || 0);
         if (Math.abs(delta) < 0.0005) continue;
         if (delta < 0) {
-          refusals.push(`${line.label}: ${num(made[line.key])} t is already posted, and a movement is not unposted by typing a smaller number. Reverse it on the posting screen.`);
+          refusals.push(`${line.label}: ${num(made[line.key])} t is already posted, and a movement is not unposted by typing a smaller number. Reverse the movement itself — the Reverse button on the list below.`);
           continue;
         }
         const results = postAcrossScope({
@@ -1630,7 +2307,7 @@ function recordActuals(date) {
       }
 
       save();
-      renderActual();
+      route();
       if (refusals.length) {
         toast(`${postedCount} posted. Refused: ${refusals[0]}`, true);
       } else {
@@ -1779,7 +2456,7 @@ function renderPlan() {
 
   document.getElementById("pl-month").addEventListener("change", e => {
     renderPlan.month = e.target.value;
-    renderPlan();
+    route();
   });
   view.querySelectorAll("[data-day]").forEach(b => b.addEventListener("click", () => editPlanDay(b.dataset.day)));
   const revert = document.getElementById("pl-revert");
@@ -1788,7 +2465,7 @@ function renderPlan() {
       requirePermission("editPlan");
       db.plan = SEED.production.map(r => r.slice());
       db.storagePlan = recomputeStoragePlan(db.plan);
-      save(); renderPlan(); toast("The workbook's own figures are back.");
+      save(); route(); toast("The workbook's own figures are back.");
     } catch (err) { toast(err.message, true); }
   });
 }
@@ -1860,7 +2537,7 @@ function editPlanDay(date) {
       const after = findings();
 
       save();
-      renderPlan();
+      route();
 
       const moved = after.map((a, i) => {
         const b = before[i];
@@ -1972,6 +2649,7 @@ function openDialog(title, bodyHtml, onSave) {
   dlg.innerHTML = `<h2>${esc(title)}</h2><div class="body">${bodyHtml}<div id="dlgerr" hidden></div></div>
     <div class="foot"><button class="btn" id="dlg-cancel" type="button">Cancel</button>
     <button class="btn primary" id="dlg-save" type="button">Save</button></div>`;
+  localise(dlg);
   dlg.showModal();
   document.getElementById("dlg-cancel").addEventListener("click", () => dlg.close());
   document.getElementById("dlg-save").addEventListener("click", () => {
@@ -2025,6 +2703,7 @@ function route() {
   renderNav(page);
   ({ dashboard: renderDashboard, storage: renderStorage, movement: renderMovement,
      actual: renderActual, ledger: renderLedger, plan: renderPlan, users: renderUsers }[page])();
+  localise(document.getElementById("app"));
   save();
 }
 
@@ -2037,6 +2716,7 @@ window.addEventListener("hashchange", route);
 function showLogin() {
   document.getElementById("app").hidden = true;
   document.getElementById("login").hidden = false;
+  localise(document.getElementById("login"));
   drawChart();
 }
 
@@ -2189,6 +2869,9 @@ window.addEventListener("resize", () => {
 /* =========================================================================
    Boot
    ====================================================================== */
+document.documentElement.setAttribute("lang", LANG);
+renderLangPickers();
+
 db = load();
 if (!db) resetDb();
 route();

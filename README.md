@@ -78,12 +78,24 @@ they refuse it with, and comparing any one of the 276 days against what was
 actually posted.
 
 That last screen keeps the rule the real system keeps: **actuals are derived
-from posted movements, never keyed in.** Recording a day's actual production
-writes the receipts and issues it implies, through the ordinary posting path,
-and the actual column adds them up — so every figure can be traced to the
-movements underneath it, listed on the same screen. It also shows what that
-rule costs: cane crushed is not stock, so no movement carries it, so the screen
-says "not derivable" instead of a zero.
+from posted movements, never keyed in.** There is no actual column to type
+into. A day's actuals get there in one of two ways — recording the whole day's
+production, which writes the receipts and issues it implies, or entering a
+single movement against one line, for the shift that knows exactly which
+warehouse it went into. Either way the figures are added up from movements
+listed on the same screen. A wrong movement is corrected by reversing it: both
+lines stay, each naming the other, and the actual goes down by the reversed
+amount. It also shows what the rule costs: cane crushed is not stock, so no
+movement carries it, so the screen says "not derivable" instead of a zero.
+
+**The interface is in English, Khmer and Thai** — a switch in the left rail,
+and the choice is remembered. The navigation, buttons, table headings, field
+labels, product names, movement types and the name of whichever rule refused a
+posting are all translated; storage codes, batch numbers, check codes and the
+exact sentence a refusal gives are not, because those are what somebody reads
+out to a colleague or types into another system. The longer paragraphs
+explaining why a screen behaves as it does stay in English, and the language
+switch says so rather than leaving it to be discovered.
 
 It is not a mock-up. The master data, the capacity rules and all 276 days of
 the season plan are the real ones: `scripts/extract_seed_data.py` reads them
