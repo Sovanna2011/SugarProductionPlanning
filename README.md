@@ -74,6 +74,20 @@ That brings up PostgreSQL and the API server with the dashboard bundled, and
 seeds the database on first start with the master data and the 2026/27 season
 plan. Override `SPP_DB_PASSWORD`, `SPP_PORT` and `SPP_DB_PORT` as needed.
 
+A fresh database has the plan but no stock, so every warehouse reads 0%. To see
+the dashboard with something in it:
+
+```bash
+docker compose exec app spp-seed-demo            # or, from source:
+cd backend && go run ./cmd/seed-demo             # 15 Feb 2027 by default
+```
+
+The positions are the season plan's own closing figures for that date, split
+across each pool's members in proportion to capacity, and posted through the
+normal service so they pass the same capacity validation as any other receipt.
+Pass `-date 2027-04-10` for the raw sugar peak. It refuses to run against a
+database that already holds stock unless given `-force`.
+
 ### Running from source
 
 ### 1. Database

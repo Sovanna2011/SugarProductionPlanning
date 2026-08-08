@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"math"
 	"strconv"
 	"time"
 
@@ -241,12 +242,22 @@ func (s *Service) PlanVsActual(ctx context.Context, factoryID int64, date time.T
 	return rows, nil
 }
 
-// formatNumber renders an optional quantity for an alert message.
+// formatNumber renders an optional weight for an alert message.
 func formatNumber(v *float64) string {
 	if v == nil {
 		return "0"
 	}
 	return strconv.FormatFloat(*v, 'f', -1, 64)
+}
+
+// formatPackages renders a package count for an alert message. Packages are
+// whole things, so "18,217.391 spaces available" is never the right sentence
+// even when the underlying balance carries a fraction.
+func formatPackages(v *float64) string {
+	if v == nil {
+		return "0"
+	}
+	return strconv.FormatFloat(math.Round(*v), 'f', 0, 64)
 }
 
 func formatFull(name string, u capacity.Utilization) string {

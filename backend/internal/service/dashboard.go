@@ -134,7 +134,12 @@ func (s *Service) Dashboard(ctx context.Context, f DashboardFilter) (Dashboard, 
 	if err != nil {
 		return Dashboard{}, err
 	}
-	out := Dashboard{AsOfDate: date.Format("2006-01-02")}
+	out := Dashboard{
+		AsOfDate: date.Format("2006-01-02"),
+		Groups:   []GroupCard{},
+		Storages: []StorageCard{},
+		Alerts:   []Alert{},
+	}
 	for _, fac := range factories {
 		if fac.ID == f.FactoryID || f.FactoryID == 0 {
 			out.FactoryCode, out.FactoryName = fac.Code, fac.Name
@@ -287,7 +292,7 @@ func (s *Service) Dashboard(ctx context.Context, f DashboardFilter) (Dashboard, 
 
 // buildAlerts turns anything above the normal band into an operator message.
 func buildAlerts(d Dashboard) []Alert {
-	var alerts []Alert
+	alerts := []Alert{}
 
 	consider := func(code, name, scopeType string, u capacity.Utilization, msg string) {
 		if u.Band.Severity == capacity.SeverityNormal {
@@ -321,7 +326,7 @@ func buildAlerts(d Dashboard) []Alert {
 				" of space left for " + p.ProductName + " " + p.PackagingCode
 			if p.AvailablePackageSpaces != nil {
 				msg = st.StorageName + " has only " +
-					formatNumber(p.AvailablePackageSpaces) + " spaces available for " +
+					formatPackages(p.AvailablePackageSpaces) + " spaces available for " +
 					p.ProductName + " " + p.PackagingCode
 			}
 			alerts = append(alerts, Alert{
