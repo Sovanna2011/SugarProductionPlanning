@@ -219,6 +219,18 @@ textarea { resize: vertical; min-height: 3.4em; }
 #signin .row { display: flex; gap: .7rem; align-items: center; }
 .msg { padding: .6em .8em; border-radius: var(--radius); font-size: .87rem; border: 1px solid; }
 .msg.bad  { background: var(--crit-bg); color: var(--crit); border-color: color-mix(in srgb, var(--crit) 35%, transparent); }
+.admininfo {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: .55rem .8rem;
+  background: var(--surface-2);
+  font-size: .9rem;
+}
+.admininfo summary { cursor: pointer; font-weight: 600; color: var(--ink-2); }
+.admininfo > .two { margin-top: .7rem; }
+.admininfo .field span { font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.admininfo .note { margin-top: .6rem; }
+
 .msg.warn { background: var(--warn-bg); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 35%, transparent); }
 .msg.good { background: var(--ok-bg);   color: var(--ok);   border-color: color-mix(in srgb, var(--ok) 35%, transparent); }
 
@@ -595,6 +607,11 @@ const DICT = {
     "Post it even if the capacity rules refuse it": "កត់ត្រាទោះបីច្បាប់សមត្ថភាពផ្ទុកបដិសេធក៏ដោយ",
     "Reason, if you override": "មូលហេតុ បើអ្នកសម្រេចលើស",
     "Language": "ភាសា",
+    "Administrative information": "ព័ត៌មានរដ្ឋបាល",
+    "Created By": "បង្កើតដោយ",
+    "Created At": "បង្កើតនៅ",
+    "Changed By": "កែដោយ",
+    "Changed At": "កែនៅ",
     "Cane crushed": "អំពៅកិន",
     "Raw sugar made": "ស្ករឆៅផលិតបាន",
     "Raw sugar to remelt": "ស្ករឆៅទៅរំលាយឡើងវិញ",
@@ -729,6 +746,11 @@ const DICT = {
     "Post it even if the capacity rules refuse it": "บันทึกแม้กฎความจุจะปฏิเสธ",
     "Reason, if you override": "เหตุผล หากข้ามการตรวจ",
     "Language": "ภาษา",
+    "Administrative information": "ข้อมูลการดูแลระบบ",
+    "Created By": "สร้างโดย",
+    "Created At": "สร้างเมื่อ",
+    "Changed By": "แก้ไขโดย",
+    "Changed At": "แก้ไขเมื่อ",
     "Cane crushed": "อ้อยที่หีบ",
     "Raw sugar made": "น้ำตาลดิบที่ผลิตได้",
     "Raw sugar to remelt": "น้ำตาลดิบส่งหลอมใหม่",
@@ -948,6 +970,92 @@ for (const m of SEED.groupMembers) (membersOf[m.group_code] ||= []).push(m.stora
 
 let db = null;
 
+/* =========================================================================
+   The four mandatory audit fields (requirement section 1).
+
+   Every record the real system stores carries created_by, created_at,
+   changed_by and changed_at, and this page carries them too — not because a
+   page with no database needs an audit trail, but because the thing being
+   demonstrated is the system, and a demonstration that leaves out the part
+   somebody will be asked to sign off is not demonstrating it.
+
+   The rules are the real ones. The timestamps come from the clock, not from
+   anything typed. Creating a record sets all four. Changing one moves only
+   changed_by and changed_at. The panel that shows them is read-only text.
+
+   Two things this page cannot reproduce, and says so rather than implying
+   otherwise: the clock here is the browser's, where the real system uses the
+   database's; and there is nothing stopping somebody editing the values in the
+   developer console, where the real system has a trigger that puts them back.
+   ====================================================================== */
+
+// The factory's own timezone, as configured in system_parameters.
+const BUSINESS_TZ = "Asia/Phnom_Penh";
+
+/** Who is writing. The real system takes this from the session, not the form. */
+function auditActor() {
+  const u = currentUser();
+  return u ? { id: u.username, name: u.displayName || u.username } : { id: "system", name: "System" };
+}
+
+/** The four fields for a record being created. */
+function auditCreate() {
+  const who = auditActor();
+  const now = new Date().toISOString();
+  return {
+    createdBy: who.id, createdByName: who.name, createdAt: now,
+    changedBy: who.id, changedByName: who.name, changedAt: now,
+  };
+}
+
+/**
+ * Stamp a change onto an existing record.
+ *
+ * Only two of the four move. Rewriting created_by on an update is the mistake
+ * the database trigger exists to prevent, so the demo does not make it either
+ * — a screen that quietly reassigns authorship on every save teaches people
+ * to distrust the column.
+ */
+function auditChange(record) {
+  const who = auditActor();
+  record.changedBy = who.id;
+  record.changedByName = who.name;
+  record.changedAt = new Date().toISOString();
+  return record;
+}
+
+/** An audit timestamp in the factory's timezone, with the zone named. */
+function auditTime(value) {
+  if (!value) return "—";
+  const when = new Date(value);
+  if (isNaN(when)) return String(value);
+  try {
+    return new Intl.DateTimeFormat("en-GB", {
+      timeZone: BUSINESS_TZ, day: "2-digit", month: "short", year: "numeric",
+      hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+    }).format(when).replace(",", "");
+  } catch (e) {
+    return when.toISOString().replace("T", " ").slice(0, 19) + " UTC";
+  }
+}
+
+/** The read-only Administrative Information block, for a dialog. */
+function adminInfoHtml(r) {
+  if (!r || !r.createdAt) return "";
+  return `<details class="admininfo">
+    <summary>Administrative information</summary>
+    <div class="two">
+      <div class="field"><span>Created By</span><b class="num">${esc(r.createdByName || r.createdBy)}</b></div>
+      <div class="field"><span>Created At</span><b class="num">${esc(auditTime(r.createdAt))}</b></div>
+      <div class="field"><span>Changed By</span><b class="num">${esc(r.changedByName || r.changedBy)}</b></div>
+      <div class="field"><span>Changed At</span><b class="num">${esc(auditTime(r.changedAt))}</b></div>
+    </div>
+    <p class="note">Read-only, and not editable anywhere. The times are the factory's
+      (${BUSINESS_TZ}); in the real system they come from the database clock rather than
+      from this browser, and a trigger puts them back if anything tries to change them.</p>
+  </details>`;
+}
+
 function freshLocations() {
   return SEED.locations.map(l => ({
     code: l.storage_code,
@@ -962,6 +1070,9 @@ function freshLocations() {
     remark: l.remark,
     uom: "TON",
     version: 1,
+    // Seeded rows have an author too: the system, not a blank.
+    createdBy: "system", createdByName: "System", createdAt: SEED_STAMP,
+    changedBy: "system", changedByName: "System", changedAt: SEED_STAMP,
   }));
 }
 
@@ -1306,9 +1417,11 @@ function reverseMovement(id, reason) {
     packages: sign * qty.packages, weight: sign * qty.weight,
     ref: original.ref, remark: reason, by: (currentUser() || {}).username || "anonymous",
     override: false, overrideReason: "", reversalOf: original.id,
+    ...auditCreate(),
   };
   db.movements.push(reversal);
   original.reversedBy = reversal.id;
+  auditChange(original);
   save();
   return reversal;
 }
@@ -1336,6 +1449,10 @@ function postMovement(req) {
     packages: sign * out.quantity.packages, weight: sign * out.quantity.weight,
     ref: req.ref || "", remark: req.remark || "", by: req.by || "system",
     override: !!(req.override && !out.validation.allowed), overrideReason: req.override ? req.overrideReason : "",
+    // posted_by (`by`) is the name on the document; created_by is which
+    // account wrote the row. They agree on every posting made through this
+    // page and would differ the moment one is keyed in on somebody's behalf.
+    ...auditCreate(),
   });
   out.posted = true;
   out.movementId = id;
@@ -1352,6 +1469,7 @@ function postMovement(req) {
    and post every line through the ordinary posting path. If the position
    loads, the posting path demonstrably works.
    ====================================================================== */
+const SEED_STAMP = new Date().toISOString();
 const SEED_DATE = "2027-02-15";
 const SPLITS = [
   { scope: "RAW-POOL", product: "RAW-SUGAR", packaging: "PKG-BULK", batch: "RS26001", share: 0.80, movement: "WAREHOUSE_RECEIPT" },
@@ -1736,7 +1854,8 @@ function editLocation(code) {
     </div>
     <label class="field"><span>Remark</span><textarea id="f-remark">${esc(l.remark)}</textarea></label>
     <p class="note">Holding ${num(locationTotal(l.code))} t right now. Lowering the capacity below that
-      is allowed — the system reports it as over capacity rather than pretending the sugar is not there.</p>`,
+      is allowed — the system reports it as over capacity rather than pretending the sugar is not there.</p>
+    ${adminInfoHtml(l)}`,
     () => {
       requirePermission("editMasterData");
       const cap = Number(document.getElementById("f-cap").value);
@@ -1750,6 +1869,7 @@ function editLocation(code) {
       l.status = document.getElementById("f-status").value;
       l.remark = document.getElementById("f-remark").value.trim();
       l.version++;
+      auditChange(l);
       save();
       route();
       toast(`${l.code} saved.`);
@@ -2519,7 +2639,8 @@ function editPlanDay(date) {
       <span>Cleaning day</span></label>
     <p class="note">Saving recomputes the raw and finished sugar curves for the rest of the
       season from this day forward, and with them the dates each pool passes its safe level
-      and its capacity.</p>`,
+      and its capacity.</p>
+    ${adminInfoHtml((db.planAudit || {})[date])}`,
     () => {
       requirePermission("editPlan");
       const values = {};
@@ -2533,6 +2654,13 @@ function editPlanDay(date) {
       r[11] = document.getElementById("pd-clean").checked ? 1 : 0;
       r[12] = document.getElementById("pd-note").value.trim();
       r[13] = 1;   // marks the day as changed from the workbook
+      // A plan day is a record, so it carries the same four fields. Keyed
+      // separately because the plan itself is an array of numbers read out of
+      // the workbook, and widening every one of 276 rows to carry audit
+      // columns would bloat the page for no reading anybody does.
+      db.planAudit = db.planAudit || {};
+      db.planAudit[date] = db.planAudit[date]
+        ? auditChange(db.planAudit[date]) : auditCreate();
       db.storagePlan = recomputeStoragePlan(db.plan);
       const after = findings();
 

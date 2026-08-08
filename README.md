@@ -536,8 +536,34 @@ Capacity figures are marked in each row's `remark`:
 > everyone will be able to read everything and change nothing.
 
 See [docs/production-plan-2026-2027.md](docs/production-plan-2026-2027.md) for
-what the plan says and what the system independently reproduces from it, and
-[docs/data-model.md](docs/data-model.md) for the schema.
+what the plan says and what the system independently reproduces from it,
+[docs/data-model.md](docs/data-model.md) for the schema, and
+[docs/audit-fields.md](docs/audit-fields.md) for the audit standard every table
+follows.
+
+## Who wrote what, and when
+
+Every table carries `created_by`, `created_at`, `changed_by` and `changed_at`.
+The users are foreign keys to the account table; the timestamps come from the
+database clock. Nobody maintains any of them by hand, and no request type has a
+field for one — a body carrying `"createdBy": 999` does not get its audit
+fields stripped, it never had any, and the key decodes into nothing.
+
+A trigger enforces it rather than a convention: it stamps both timestamps on
+every write and puts `created_by` and `created_at` back on every update, so the
+guarantee survives a repository that forgets, an `UPDATE` typed by hand, and
+any second application that never read the code. Screens show the four fields
+in a read-only **Administrative Information** panel, rendered in the factory's
+own timezone (`Asia/Phnom_Penh`, configured in `system_parameters`) so that a
+posting belongs to the day it happened on at the site rather than in the
+reader's browser.
+
+Three tests hold the line: a static scan of the migrations that needs no
+database and fails the pull request that adds a non-compliant table, an
+integration test that asks the live schema what it actually has, and one that
+exercises the guarantees rather than inspecting them. Full detail, including
+what these fields are *not* — they say who changed a record, not what changed —
+is in [docs/audit-fields.md](docs/audit-fields.md).
 
 ## Tests
 
