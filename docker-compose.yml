@@ -1,0 +1,48 @@
+# The whole system: PostgreSQL plus the API server serving the UI5 dashboard.
+#
+#   docker compose up --build
+#   open http://localhost:8080
+#
+# The database is seeded on first start: master data, and the 2026/27 season
+# plan extracted from the planning workbook.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: spp
+      POSTGRES_PASSWORD: ${SPP_DB_PASSWORD:-spp}
+      POSTGRES_DB: spp
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      # Exposed for psql and for pointing a local backend at it. Drop this
+      # line in production so the database is only reachable on the network.
+      - "${SPP_DB_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U spp -d spp"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+    environment:
+      SPP_DATABASE_URL: postgres://spp:${SPP_DB_PASSWORD:-spp}@db:5432/spp?sslmode=disable
+      SPP_ADDR: ":8080"
+      SPP_WEB_DIR: /app/web
+      SPP_AUTO_MIGRATE: "true"
+      SPP_LOG_LEVEL: ${SPP_LOG_LEVEL:-info}
+    ports:
+      - "${SPP_PORT:-8080}:8080"
+    depends_on:
+      db:
+        # Migrations run on start, so the database has to be accepting
+        # connections first rather than merely created.
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  db-data:

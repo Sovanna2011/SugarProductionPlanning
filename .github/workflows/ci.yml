@@ -124,6 +124,72 @@ jobs:
             exit 1
           fi
 
+  docker:
+    name: Container image
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: spp
+          POSTGRES_PASSWORD: spp
+          POSTGRES_DB: spp
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate the compose file
+        run: docker compose config --quiet
+
+      - name: Build the image
+        run: docker build -t kss-spp:ci .
+
+      # Proves the image actually runs: migrations apply, the API answers and
+      # the bundled dashboard is served. Host networking so the container can
+      # reach the PostgreSQL service on the runner.
+      - name: Start the container
+        run: |
+          docker run -d --name spp --network host \
+            -e SPP_DATABASE_URL='postgres://spp:spp@127.0.0.1:5432/spp?sslmode=disable' \
+            -e SPP_ADDR=':8080' \
+            kss-spp:ci
+
+      - name: Wait for the API
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8080/api/v1/health >/dev/null 2>&1; then
+              echo "API is up after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "API did not come up"
+          docker logs spp
+          exit 1
+
+      - name: Check the seeded data and the dashboard
+        run: |
+          # Migrations ran inside the container, so the season is present.
+          locations=$(curl -fsS http://127.0.0.1:8080/api/v1/master/storage-locations | grep -o '"storageCode"' | wc -l)
+          echo "storage locations served: $locations"
+          test "$locations" -ge 8
+
+          # The UI5 runtime is bundled, so the page can actually bootstrap.
+          curl -fsS -o /dev/null http://127.0.0.1:8080/index.html
+          curl -fsS -o /dev/null http://127.0.0.1:8080/resources/sap-ui-core.js
+
+      - name: Container logs
+        if: always()
+        run: docker logs spp || true
+
   webapp:
     name: UI5 dashboard build
     runs-on: ubuntu-latest

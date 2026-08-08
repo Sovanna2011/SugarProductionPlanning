@@ -138,25 +138,48 @@ func (s *Store) ListStorageGroups(ctx context.Context, factoryID int64) ([]domai
 		return nil, err
 	}
 
-	for i := range groups {
-		memberRows, err := s.pool.Query(ctx, `
-			SELECT `+storageLocationColumns+`
-			FROM storage_group_members m
-			JOIN storage_locations l ON l.id = m.storage_location_id
-			JOIN storage_types t ON t.id = l.storage_type_id
-			JOIN uoms u ON u.id = l.capacity_uom_id
-			WHERE m.storage_group_id = $1
-			ORDER BY l.storage_code`, groups[i].ID)
-		if err != nil {
-			return nil, err
-		}
-		members, err := collect(memberRows, scanStorageLocation)
-		if err != nil {
-			return nil, err
-		}
-		groups[i].Members = members
+	if len(groups) == 0 {
+		return groups, nil
 	}
-	return groups, nil
+
+	// Fetch every group's members in one query rather than one per group.
+	// The dashboard calls this on each refresh, so the round trips add up.
+	ids := make([]int64, 0, len(groups))
+	byID := make(map[int64]*domain.StorageGroup, len(groups))
+	for i := range groups {
+		ids = append(ids, groups[i].ID)
+		byID[groups[i].ID] = &groups[i]
+	}
+
+	memberRows, err := s.pool.Query(ctx, `
+		SELECT m.storage_group_id, `+storageLocationColumns+`
+		FROM storage_group_members m
+		JOIN storage_locations l ON l.id = m.storage_location_id
+		JOIN storage_types t ON t.id = l.storage_type_id
+		JOIN uoms u ON u.id = l.capacity_uom_id
+		WHERE m.storage_group_id = ANY($1)
+		ORDER BY m.storage_group_id, l.storage_code`, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer memberRows.Close()
+
+	for memberRows.Next() {
+		var groupID int64
+		var v domain.StorageLocation
+		if err := memberRows.Scan(&groupID, &v.ID, &v.FactoryID, &v.StorageCode, &v.StorageName,
+			&v.StorageTypeID, &v.StorageTypeCode, &v.StorageTypeName, &v.TracksPackages,
+			&v.PhysicalCapacity, &v.CapacityUOM,
+			&v.MinimumStockLevel, &v.SafeCapacityPercentage,
+			&v.AllowMixedProducts, &v.AllowMixedBatches,
+			&v.Status, &v.EffectiveFrom, &v.EffectiveTo, &v.Remark, &v.Version); err != nil {
+			return nil, err
+		}
+		if g := byID[groupID]; g != nil {
+			g.Members = append(g.Members, v)
+		}
+	}
+	return groups, memberRows.Err()
 }
 
 // GetStorageGroup looks a pooled group up by code.

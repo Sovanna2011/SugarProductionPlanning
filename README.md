@@ -63,6 +63,19 @@ docs/                    Data model, plan analysis, source documents
 
 ## Quick start
 
+### With Docker
+
+```bash
+docker compose up --build
+# open http://localhost:8080
+```
+
+That brings up PostgreSQL and the API server with the dashboard bundled, and
+seeds the database on first start with the master data and the 2026/27 season
+plan. Override `SPP_DB_PASSWORD`, `SPP_PORT` and `SPP_DB_PORT` as needed.
+
+### Running from source
+
 ### 1. Database
 
 ```bash
