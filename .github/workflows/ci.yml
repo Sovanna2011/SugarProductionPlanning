@@ -202,8 +202,13 @@ jobs:
             -e SPP_AUTH_MODE=local \
             -e SPP_OVERRIDE_ROLE=ADMIN \
             kss-spp:ci
+          # An `if`, not `curl ... && break`: the step runs under `set -e`, where
+          # a failing && list is fatal, so the very first poll before the server
+          # is listening would end the step.
           for i in $(seq 1 30); do
-            curl -fsS http://127.0.0.1:8080/api/v1/health >/dev/null 2>&1 && break
+            if curl -fsS http://127.0.0.1:8080/api/v1/health >/dev/null 2>&1; then
+              break
+            fi
             sleep 1
           done
 
