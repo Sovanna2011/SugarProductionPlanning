@@ -366,3 +366,23 @@ func TestOverrideAllowedWithTheRole(t *testing.T) {
 		t.Errorf("a user holding the role should be permitted, got %v", err)
 	}
 }
+
+func TestGroupDigits(t *testing.T) {
+	cases := map[string]string{
+		"0":          "0",
+		"999":        "999",
+		"1000":       "1,000",
+		"18217":      "18,217",
+		"106150":     "106,150",
+		"2300000":    "2,300,000",
+		"5497.091":   "5,497.091",
+		"-18050":     "-18,050",
+		"-1234.5":    "-1,234.5",
+		"109720.500": "109,720.500",
+	}
+	for in, want := range cases {
+		if got := groupDigits(in); got != want {
+			t.Errorf("groupDigits(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

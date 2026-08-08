@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/capacity"
@@ -247,7 +248,7 @@ func formatNumber(v *float64) string {
 	if v == nil {
 		return "0"
 	}
-	return strconv.FormatFloat(*v, 'f', -1, 64)
+	return groupDigits(strconv.FormatFloat(*v, 'f', -1, 64))
 }
 
 // formatPackages renders a package count for an alert message. Packages are
@@ -257,12 +258,43 @@ func formatPackages(v *float64) string {
 	if v == nil {
 		return "0"
 	}
-	return strconv.FormatFloat(math.Round(*v), 'f', 0, 64)
+	return groupDigits(strconv.FormatFloat(math.Round(*v), 'f', 0, 64))
+}
+
+// groupDigits inserts thousands separators into a formatted number, so an
+// alert reads "18,217 spaces available" as the requirement's own examples do
+// rather than "18217". Only the integer part is grouped.
+func groupDigits(s string) string {
+	sign := ""
+	if strings.HasPrefix(s, "-") {
+		sign, s = "-", s[1:]
+	}
+
+	whole, frac := s, ""
+	if i := strings.IndexByte(s, '.'); i >= 0 {
+		whole, frac = s[:i], s[i:]
+	}
+	if len(whole) <= 3 {
+		return sign + whole + frac
+	}
+
+	var b strings.Builder
+	lead := len(whole) % 3
+	if lead > 0 {
+		b.WriteString(whole[:lead])
+	}
+	for i := lead; i < len(whole); i += 3 {
+		if b.Len() > 0 {
+			b.WriteByte(',')
+		}
+		b.WriteString(whole[i : i+3])
+	}
+	return sign + b.String() + frac
 }
 
 func formatFull(name string, u capacity.Utilization) string {
 	return fmt.Sprintf("%s is %s%% full (%s of %s %s)", name,
 		strconv.FormatFloat(u.UtilizationPct, 'f', -1, 64),
-		strconv.FormatFloat(u.CurrentStock, 'f', -1, 64),
-		strconv.FormatFloat(u.Capacity, 'f', -1, 64), u.UOM)
+		groupDigits(strconv.FormatFloat(u.CurrentStock, 'f', -1, 64)),
+		groupDigits(strconv.FormatFloat(u.Capacity, 'f', -1, 64)), u.UOM)
 }
