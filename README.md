@@ -99,8 +99,9 @@ SPP_WEB_DIR=$PWD/dist go run ./backend/cmd/server
 ```
 
 `npm run build` produces a self-contained `dist/` including the OpenUI5 runtime,
-so the dashboard needs no CDN access. To use the SAP CDN instead, change the
-bootstrap `src` in `webapp/index.html`.
+so the dashboard needs no CDN access. Use `npm run build:app` for an app-only
+build when deploying against an existing SAPUI5 runtime served at `/resources`,
+or change the bootstrap `src` in `webapp/index.html` to use the SAP CDN.
 
 ### Configuration
 
@@ -283,10 +284,40 @@ what the plan says and what the system independently reproduces from it, and
 ## Tests
 
 ```bash
-cd backend && go test ./...
+cd backend
+go test ./...                        # unit tests, no database needed
 ```
 
-The capacity engine has 24 tests covering conversion, alert banding, all five
-pre-posting checks and projection. Three assert against real season figures:
-the finished goods pool overflowing on 28 May 2027, the requirement document's
-tank example, and the shared-warehouse rule.
+The capacity engine has 24 unit tests covering conversion, alert banding, all
+five pre-posting checks and projection. Three assert against real season
+figures: the finished goods pool overflowing on 28 May 2027, the requirement
+document's tank example, and the shared-warehouse rule.
+
+Integration tests are build-tagged so the default run stays hermetic:
+
+```bash
+createdb spp_test
+SPP_TEST_DATABASE_URL="postgres://localhost/spp_test" \
+  go test -tags=integration -count=1 ./...
+```
+
+They cover what the unit tests cannot: the SQL, migration idempotency, the
+seeded season still reconciling with the summary report, every plan line
+balancing, the capacity rules against real master data, and balances following
+posted movements. They create the schema themselves and clean up after
+themselves, so they can run repeatedly against the same database.
+
+## CI
+
+`.github/workflows/ci.yml` runs on every pull request:
+
+| Job | What it checks |
+|---|---|
+| **backend** | `gofmt`, `go vet` (including the integration build), `go test -race`, `go build` |
+| **integration** | Migrations against a real PostgreSQL 16, applied twice to prove idempotency, then the tagged tests |
+| **seed-drift** | Regenerates the season seed from the workbook and fails if the committed file differs |
+| **webapp** | `npm ci`, both build variants, and that the bundled build can actually bootstrap |
+
+The seed-drift job is the one worth understanding: the generator asserts every
+season total against the summary report, so it fails if the workbook and the
+committed seed ever diverge.
