@@ -35,38 +35,64 @@ constraint enforces that the reason cannot be empty.
 **The container runs as a non-root user**, holds no secrets, and is built from
 a static binary with no shell dependencies beyond busybox.
 
-## What is not in place
+## Authentication
 
-These two are the same problem seen from two angles, and both need a decision
-about how this system authenticates before they can be closed.
+The plumbing is in place and the mechanism is pluggable, because which one is
+right depends on what the factory already runs.
 
-### 1. There is no authentication
+Once a request is authenticated, **the audit trail takes the actor from the
+authenticated identity and ignores the `postedBy` / `updatedBy` field in the
+request body.** A caller claiming to be somebody else is recorded as
+themselves. That is the property that matters: section 24 permits exceeding
+physical capacity only under an authorised override, so the record of who
+authorised it has to mean something.
 
-Every endpoint is open. Anyone who can reach the port can read the whole
-inventory, post movements, override capacity blocks and rewrite master data.
+### Modes
 
-The system is currently only safe on a trusted network — behind a reverse proxy
-that authenticates, or on a segment reachable solely by the factory's own
-machines. `Access-Control-Allow-Origin` is `*`, which is harmless while there
-are no credentials to steal and unacceptable once there are.
+`SPP_AUTH_MODE` selects the mechanism.
 
-### 2. The audit trail is self-declared
+| Mode | Behaviour |
+|---|---|
+| `none` *(default)* | No authentication. Every endpoint is open and the actor falls back to whatever the caller declared. The server logs a warning naming this file on every start. |
+| `proxy` | Trusts an upstream reverse proxy to have authenticated the user and to pass the identity in a header. |
 
-`postedBy` and `updatedBy` arrive in the request body. The server records
-whatever string it is given. So the movement ledger shows who a caller *said*
-they were, not who they were.
+```bash
+SPP_AUTH_MODE=proxy
+SPP_AUTH_USER_HEADER=X-Forwarded-User      # the subject; this is what is recorded
+SPP_AUTH_NAME_HEADER=X-Forwarded-Name      # optional display name
+SPP_AUTH_ROLES_HEADER=X-Forwarded-Groups   # optional, comma separated
+```
 
-This matters more here than it would in most systems, because the override
-mechanism is the accountability control. Section 24 of the requirement permits
-exceeding physical capacity only when "an authorized business rule explicitly
-permits an override" — and the record of who authorised it is, at present,
-whatever the client typed.
+**`proxy` mode is only as trustworthy as the network in front of it.** The
+header is believed unconditionally, so the application must be reachable *only*
+through the proxy. If a caller can connect to the port directly, they can set
+the header themselves and the mode buys nothing.
 
-**The fix is the same in both cases:** authenticate the request, then take the
-actor from the authenticated identity and ignore the field in the body. That is
-a small change to `service` and `httpapi` once the mechanism is chosen. The
-mechanism is the open question, because it depends on what the factory already
-runs.
+### What is still open
+
+**`none` is the default,** so an unconfigured deployment is exactly as open as
+it was before. That is deliberate — turning authentication on is a decision
+about the factory's environment, not something to impose by default — but it
+means the warning at startup is the only thing standing between a fresh
+deployment and an open system.
+
+**Nothing is authorised yet.** Roles are carried from the mechanism into the
+request context, but no endpoint checks them. Any authenticated user can do
+anything, including force a capacity override. Restricting overrides to a
+specific role is the natural next step and the plumbing now exists for it.
+
+**A request that skips the proxy is anonymous, not rejected.** Under `proxy`
+mode a request arriving without the header is logged as a warning and treated
+as unauthenticated rather than refused, because in a correct deployment it
+cannot happen and refusing would mostly break local debugging. Once a mechanism
+is settled, this should become a 401.
+
+**No OIDC.** If the factory would rather the application validate tokens from
+an identity provider directly than trust a proxy, that is a new `Mode` in
+`internal/auth` and nothing else changes.
+
+**CORS is `Access-Control-Allow-Origin: *`,** which is harmless while there are
+no credentials to steal and should be narrowed once there are.
 
 ## Other things to settle before production
 

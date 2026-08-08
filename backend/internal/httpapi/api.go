@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sovanna2011/sugarproductionplanning/backend/internal/auth"
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/service"
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/store/postgres"
 )
@@ -20,12 +21,13 @@ type API struct {
 	svc    *service.Service
 	log    *slog.Logger
 	webDir string
+	auth   auth.Config
 }
 
 // New builds the API. webDir, when set, is served at / so the UI5 dashboard and
 // the backend can run from one process in development.
-func New(svc *service.Service, log *slog.Logger, webDir string) *API {
-	return &API{svc: svc, log: log, webDir: webDir}
+func New(svc *service.Service, log *slog.Logger, webDir string, authCfg auth.Config) *API {
+	return &API{svc: svc, log: log, webDir: webDir, auth: authCfg}
 }
 
 // Routes returns the configured mux.
@@ -75,7 +77,9 @@ func (a *API) Routes() http.Handler {
 		mux.Handle("/", http.FileServer(http.Dir(a.webDir)))
 	}
 
-	return a.recoverPanic(cors(mux))
+	// Identity is established before anything else, so every handler and
+	// service below reads the actor from the request context.
+	return a.recoverPanic(cors(auth.Middleware(a.auth, a.log)(mux)))
 }
 
 // --- helpers ---------------------------------------------------------------

@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/sovanna2011/sugarproductionplanning/backend/internal/auth"
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/capacity"
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/store/postgres"
 )
@@ -100,7 +101,7 @@ func (s *Service) adjustReservation(ctx context.Context, req ReservationRequest,
 		BatchNo:           req.BatchNo,
 		DeltaPackages:     sign * qty.Packages,
 		DeltaWeight:       sign * qty.Weight,
-		UpdatedBy:         req.UpdatedBy,
+		UpdatedBy:         auth.Actor(ctx, req.UpdatedBy),
 	})
 	if err != nil {
 		if errors.Is(err, postgres.ErrInsufficientStock) {

@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/sovanna2011/sugarproductionplanning/backend/internal/auth"
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/config"
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/httpapi"
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/service"
@@ -56,7 +57,17 @@ func run() error {
 		log.Info("migrations up to date", "count", len(files))
 	}
 
-	api := httpapi.New(service.New(store), log, cfg.WebDir)
+	// A deployment that has not chosen an authentication mechanism is only
+	// safe on a trusted network, and should be told so on every start.
+	if cfg.Auth.Mode == auth.ModeNone {
+		log.Warn("authentication is disabled: every endpoint is open and the audit trail " +
+			"records whatever the caller declares. Safe only on a trusted network. " +
+			"See docs/security.md")
+	} else {
+		log.Info("authentication enabled", "mode", cfg.Auth.Mode, "userHeader", cfg.Auth.UserHeader)
+	}
+
+	api := httpapi.New(service.New(store), log, cfg.WebDir, cfg.Auth)
 	srv := &http.Server{
 		Addr:              cfg.Addr,
 		Handler:           api.Routes(),

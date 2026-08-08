@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/sovanna2011/sugarproductionplanning/backend/internal/auth"
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/capacity"
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/domain"
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/store/postgres"
@@ -271,7 +272,7 @@ func (s *Service) prepare(ctx context.Context, req MovementRequest) (postgres.Ne
 		Remark:                 req.Remark,
 		CapacityOverride:       req.Override && !resp.Validation.Allowed,
 		CapacityOverrideReason: req.OverrideReason,
-		CreatedBy:              req.PostedBy,
+		CreatedBy:              auth.Actor(ctx, req.PostedBy),
 	}
 	if !out.CapacityOverride {
 		out.CapacityOverrideReason = ""

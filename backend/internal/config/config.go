@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/sovanna2011/sugarproductionplanning/backend/internal/auth"
 )
 
 // Config is the server configuration.
@@ -20,6 +22,9 @@ type Config struct {
 	AutoMigrate bool
 	// LogLevel is one of debug, info, warn, error.
 	LogLevel string
+	// Auth selects how requests are authenticated. Defaults to none, which
+	// preserves the original behaviour and is only safe on a trusted network.
+	Auth auth.Config
 	// ShutdownTimeout bounds graceful shutdown.
 	ShutdownTimeout time.Duration
 }
@@ -33,7 +38,19 @@ func Load() (Config, error) {
 		AutoMigrate:     env("SPP_AUTO_MIGRATE", "true") == "true",
 		LogLevel:        env("SPP_LOG_LEVEL", "info"),
 		ShutdownTimeout: 15 * time.Second,
+		Auth: auth.Config{
+			UserHeader:  env("SPP_AUTH_USER_HEADER", "X-Forwarded-User"),
+			NameHeader:  env("SPP_AUTH_NAME_HEADER", "X-Forwarded-Name"),
+			RolesHeader: env("SPP_AUTH_ROLES_HEADER", "X-Forwarded-Groups"),
+		},
 	}
+
+	mode, ok := auth.ParseMode(env("SPP_AUTH_MODE", string(auth.ModeNone)))
+	if !ok {
+		return c, fmt.Errorf("SPP_AUTH_MODE must be none or proxy, got %q", os.Getenv("SPP_AUTH_MODE"))
+	}
+	c.Auth.Mode = mode
+
 	if strings.TrimSpace(c.DatabaseURL) == "" {
 		return c, fmt.Errorf("SPP_DATABASE_URL is required, for example postgres://user:pass@localhost:5432/spp")
 	}

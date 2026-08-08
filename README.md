@@ -125,6 +125,8 @@ or change the bootstrap `src` in `webapp/index.html` to use the SAP CDN.
 | `SPP_WEB_DIR` | *(none)* | Directory to serve the dashboard from |
 | `SPP_AUTO_MIGRATE` | `true` | Apply pending migrations on start |
 | `SPP_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
+| `SPP_AUTH_MODE` | `none` | `none` or `proxy`. See [docs/security.md](docs/security.md) |
+| `SPP_AUTH_USER_HEADER` | `X-Forwarded-User` | Identity header under `proxy` mode |
 
 ## The capacity rules
 
@@ -353,9 +355,9 @@ Capacity figures are marked in each row's `remark`:
   confirming with operations.** They are ordinary master data rows.
 
 > **Before deploying this outside a trusted network, read
-> [docs/security.md](docs/security.md).** There is no authentication yet, and
-> the `postedBy` audit field is taken from the request body rather than from an
-> authenticated identity.
+> [docs/security.md](docs/security.md).** Authentication defaults to `none`, so
+> an unconfigured deployment is open. Set `SPP_AUTH_MODE=proxy` behind an
+> authenticating reverse proxy, and note that no endpoint checks roles yet.
 
 See [docs/production-plan-2026-2027.md](docs/production-plan-2026-2027.md) for
 what the plan says and what the system independently reproduces from it, and

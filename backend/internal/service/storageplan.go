@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/sovanna2011/sugarproductionplanning/backend/internal/auth"
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/capacity"
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/domain"
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/store/postgres"
@@ -195,7 +196,7 @@ func (s *Service) SaveStoragePlanLine(ctx context.Context, in StoragePlanLineInp
 		WeightUOMID:          uomID,
 		Status:               in.Status,
 		Remark:               in.Remark,
-		UpdatedBy:            in.UpdatedBy,
+		UpdatedBy:            auth.Actor(ctx, in.UpdatedBy),
 	}); err != nil {
 		return StoragePlanResult{}, err
 	}

@@ -7,6 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/sovanna2011/sugarproductionplanning/backend/internal/auth"
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/capacity"
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/domain"
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/store/postgres"
@@ -94,7 +95,7 @@ func (s *Service) SaveStorageLocation(ctx context.Context, in StorageLocationInp
 		EffectiveTo:            in.EffectiveTo,
 		Remark:                 in.Remark,
 		Version:                in.Version,
-		UpdatedBy:              in.UpdatedBy,
+		UpdatedBy:              auth.Actor(ctx, in.UpdatedBy),
 	})
 	if err != nil {
 		return SaveResult{}, translateWriteError(err)
@@ -179,7 +180,7 @@ func (s *Service) SaveStorageProductCapacity(ctx context.Context, in StorageProd
 		Status:            in.Status,
 		Remark:            in.Remark,
 		Version:           in.Version,
-		UpdatedBy:         in.UpdatedBy,
+		UpdatedBy:         auth.Actor(ctx, in.UpdatedBy),
 	})
 	if err != nil {
 		return SaveResult{}, translateWriteError(err)
@@ -228,7 +229,7 @@ func (s *Service) SavePackagingType(ctx context.Context, in PackagingTypeInput) 
 		IsBulk:         in.IsBulk,
 		Status:         in.Status,
 		Version:        in.Version,
-		UpdatedBy:      in.UpdatedBy,
+		UpdatedBy:      auth.Actor(ctx, in.UpdatedBy),
 	})
 	if err != nil {
 		return SaveResult{}, translateWriteError(err)
@@ -250,7 +251,7 @@ func (s *Service) ReplaceThresholdBands(ctx context.Context, in ThresholdBandsIn
 			UIState: b.UIState, From: b.From, To: b.To,
 		})
 	}
-	if err := s.store.ReplaceThresholdBands(ctx, in.FactoryID, rows, in.UpdatedBy); err != nil {
+	if err := s.store.ReplaceThresholdBands(ctx, in.FactoryID, rows, auth.Actor(ctx, in.UpdatedBy)); err != nil {
 		return nil, err
 	}
 	return s.store.ListThresholdBands(ctx, in.FactoryID)
