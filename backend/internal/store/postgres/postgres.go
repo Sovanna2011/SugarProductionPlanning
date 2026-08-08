@@ -47,11 +47,24 @@ func (s *Store) Pool() *pgxpool.Pool { return s.pool }
 // schema_migrations. Each file runs in its own transaction, which the files
 // themselves declare with BEGIN/COMMIT.
 func (s *Store) Migrate(ctx context.Context, files map[string]string) error {
-	// schema_migrations is created by the first migration, so a missing table
-	// simply means nothing has been applied yet.
+	// schema_migrations is created by the first migration, so on an empty
+	// database it does not exist yet. Ask whether the table is there rather
+	// than selecting from it and ignoring the failure: a failed query is
+	// logged as an ERROR by the server, and a fresh deployment should not
+	// leave alarming lines in the database log on its first boot.
+	var migrationsTableExists bool
+	if err := s.pool.QueryRow(ctx,
+		`SELECT to_regclass('public.schema_migrations') IS NOT NULL`).
+		Scan(&migrationsTableExists); err != nil {
+		return fmt.Errorf("check schema_migrations: %w", err)
+	}
+
 	applied := map[string]bool{}
-	rows, err := s.pool.Query(ctx, `SELECT version FROM schema_migrations`)
-	if err == nil {
+	if migrationsTableExists {
+		rows, err := s.pool.Query(ctx, `SELECT version FROM schema_migrations`)
+		if err != nil {
+			return fmt.Errorf("read applied migrations: %w", err)
+		}
 		for rows.Next() {
 			var v string
 			if err := rows.Scan(&v); err != nil {
@@ -61,6 +74,9 @@ func (s *Store) Migrate(ctx context.Context, files map[string]string) error {
 			applied[v] = true
 		}
 		rows.Close()
+		if err := rows.Err(); err != nil {
+			return err
+		}
 	}
 
 	versions := make([]string, 0, len(files))
