@@ -207,7 +207,7 @@ func (a *API) login(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, service.ErrValidation):
 			status = http.StatusBadRequest
 		}
-		a.fail(w, r, status, err)
+		a.fail(w, r, status, withoutSentinel(err))
 		return
 	}
 
@@ -380,6 +380,26 @@ func (a *API) signOutUser(w http.ResponseWriter, r *http.Request) {
 		}
 		return map[string]int64{"sessionsEnded": n}, nil
 	})
+}
+
+// withoutSentinel strips the classifying error's own text from a message.
+//
+// The service wraps its errors in a sentinel so the HTTP layer can pick a
+// status code, which leaves the sentinel's name on the front of the message:
+// "not authenticated: the user name or password is not correct". That reads
+// fine in a log and badly on a login form, which is the most-seen screen in
+// the system and the one a person is staring at when something has gone wrong.
+//
+// Only the sign-in path uses this. Elsewhere the prefix is a useful hint about
+// what kind of answer an API client just got.
+func withoutSentinel(err error) error {
+	for _, sentinel := range []error{service.ErrUnauthorized, service.ErrValidation} {
+		prefix := sentinel.Error() + ": "
+		if errors.Is(err, sentinel) && strings.HasPrefix(err.Error(), prefix) {
+			return errors.New(strings.TrimPrefix(err.Error(), prefix))
+		}
+	}
+	return err
 }
 
 // --- cookie -----------------------------------------------------------------

@@ -1,6 +1,8 @@
 package httpapi
 
 import (
+	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -8,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/auth"
+	"github.com/sovanna2011/sugarproductionplanning/backend/internal/service"
 )
 
 // guarded runs one request through the guard and reports the status, plus
@@ -173,5 +176,32 @@ func TestPermissionsMatchTheRouteTable(t *testing.T) {
 	open := (&API{auth: auth.Config{Mode: auth.ModeNone}}).permissionsFor(auth.Identity{}, false)
 	if !open.EditMasterData || !open.PostMovements || !open.ManageUsers {
 		t.Fatalf("with authentication off the UI would hide working buttons: %+v", open)
+	}
+}
+
+func TestWithoutSentinel(t *testing.T) {
+	// A login form is the most-seen screen in the system and the one somebody
+	// is staring at when something has gone wrong. "not authenticated:" in
+	// front of the explanation is a log line, not a sentence for a person.
+	wrapped := fmt.Errorf("%w: the user name or password is not correct", service.ErrUnauthorized)
+	if got := withoutSentinel(wrapped).Error(); got != "the user name or password is not correct" {
+		t.Fatalf("got %q, want the message without the sentinel", got)
+	}
+
+	validation := fmt.Errorf("%w: enter a user name and password", service.ErrValidation)
+	if got := withoutSentinel(validation).Error(); got != "enter a user name and password" {
+		t.Fatalf("got %q", got)
+	}
+
+	// An error that is not one of the classifying sentinels is left alone.
+	plain := errors.New("too many failed sign-in attempts from this address")
+	if got := withoutSentinel(plain).Error(); got != plain.Error() {
+		t.Fatalf("an unwrapped error was rewritten to %q", got)
+	}
+
+	// And one that wraps a sentinel without carrying its text keeps its own.
+	odd := fmt.Errorf("something else entirely: %w", service.ErrUnauthorized)
+	if got := withoutSentinel(odd).Error(); got != odd.Error() {
+		t.Fatalf("got %q, want the message untouched when the prefix is not there", got)
 	}
 }
