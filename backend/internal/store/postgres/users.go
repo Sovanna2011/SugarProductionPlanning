@@ -335,6 +335,18 @@ func (s *Store) SessionUser(ctx context.Context, tokenHash []byte) (domain.User,
 	return p.user, p.session, true, nil
 }
 
+// ExtendSession pushes a session's expiry out to expiresAt.
+//
+// It refuses to bring an expiry forward, so a caller that has miscalculated
+// cannot quietly shorten a live session.
+func (s *Store) ExtendSession(ctx context.Context, sessionID int64, expiresAt time.Time) error {
+	_, err := s.pool.Exec(ctx, `
+		UPDATE user_sessions
+		SET expires_at = $2
+		WHERE id = $1 AND revoked_at IS NULL AND expires_at < $2`, sessionID, expiresAt)
+	return err
+}
+
 // RevokeSession ends one session. Revoking an unknown or already-revoked token
 // is not an error: logging out twice should not fail.
 func (s *Store) RevokeSession(ctx context.Context, tokenHash []byte) error {

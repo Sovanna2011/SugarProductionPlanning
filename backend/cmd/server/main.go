@@ -60,7 +60,8 @@ func run() error {
 
 	svc := service.New(store,
 		service.WithOverrideRole(cfg.OverrideRole),
-		service.WithSessionTTL(cfg.Auth.SessionTTL))
+		service.WithSessionTTL(cfg.Auth.SessionTTL),
+		service.WithSessionMaxLifetime(cfg.Auth.SessionMaxLifetime))
 	if cfg.OverrideRole != "" {
 		log.Info("capacity overrides restricted", "role", cfg.OverrideRole)
 	}
@@ -91,8 +92,9 @@ func run() error {
 				"project documentation. Deactivate them before the system holds anything real: "+
 				"spp-seed-users -remove-demo", "accounts", demo)
 		}
-		log.Info("authentication enabled", "mode", cfg.Auth.Mode,
-			"users", n, "sessionTtl", cfg.Auth.SessionTTL, "secureCookie", cfg.Auth.CookieSecure)
+		log.Info("authentication enabled", "mode", cfg.Auth.Mode, "users", n,
+			"sessionIdleTtl", cfg.Auth.SessionTTL, "sessionMaxLifetime", cfg.Auth.SessionMaxLifetime,
+			"secureCookie", cfg.Auth.CookieSecure)
 		if !cfg.Auth.CookieSecure {
 			log.Warn("the session cookie is not marked Secure, so a browser will send it over " +
 				"plain HTTP. Set SPP_SESSION_COOKIE_SECURE=true wherever this is served over HTTPS")

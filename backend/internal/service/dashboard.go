@@ -18,9 +18,11 @@ type Service struct {
 	// overrideRole, when set, is the role a user must hold to force a posting
 	// that capacity validation blocked. Empty means no restriction.
 	overrideRole string
-	// authSessionTTL is how long a session issued by Login lasts. Zero means
-	// the default.
+	// authSessionTTL is how long a session survives without being used. Zero
+	// means the default.
 	authSessionTTL time.Duration
+	// authSessionMaxLifetime caps how long use can keep a session alive.
+	authSessionMaxLifetime time.Duration
 }
 
 // Option configures a Service.

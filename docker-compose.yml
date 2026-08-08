@@ -50,6 +50,7 @@ services:
       SPP_AUTH_MODE: ${SPP_AUTH_MODE:-none}
       SPP_OVERRIDE_ROLE: ${SPP_OVERRIDE_ROLE:-}
       SPP_SESSION_TTL: ${SPP_SESSION_TTL:-12h}
+      SPP_SESSION_MAX_LIFETIME: ${SPP_SESSION_MAX_LIFETIME:-168h}
       SPP_SESSION_COOKIE_SECURE: ${SPP_SESSION_COOKIE_SECURE:-false}
 
       # Behind a reverse proxy, name it here or every client looks like the

@@ -574,3 +574,120 @@ func TestSuccessDoesNotConsumeTheAllowance(t *testing.T) {
 		}
 	}
 }
+
+// TestUsingASessionKeepsItAlive covers the behaviour a fixed expiry gets
+// wrong: somebody working a long shift signed out mid-task, for no reason
+// connected to anything they did.
+func TestUsingASessionKeepsItAlive(t *testing.T) {
+	store, ctx := open(t)
+
+	const password = "Integration-Test-2027"
+	user := account(t, store, ctx, "itest-shift-worker", password, auth.RoleWarehouse)
+
+	// A short idle window so the test does not have to wait twelve hours.
+	svc := service.New(store,
+		service.WithSessionTTL(time.Hour),
+		service.WithSessionMaxLifetime(24*time.Hour))
+
+	res, err := svc.Login(ctx, service.LoginRequest{Username: user.Username, Password: password})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Wind the expiry back so the session is inside the last half of its
+	// window, which is when using it should push it out.
+	if _, err := store.Pool().Exec(ctx,
+		`UPDATE user_sessions SET expires_at = now() + INTERVAL '10 minutes'
+		 WHERE user_id = $1`, user.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, ok, err := svc.ResolveSession(ctx, res.Token); !ok || err != nil {
+		t.Fatalf("the session did not resolve: ok=%v err=%v", ok, err)
+	}
+
+	var extended time.Time
+	if err := store.Pool().QueryRow(ctx,
+		`SELECT expires_at FROM user_sessions WHERE user_id = $1`, user.ID).Scan(&extended); err != nil {
+		t.Fatal(err)
+	}
+	if !extended.After(time.Now().Add(50 * time.Minute)) {
+		t.Fatalf("expiry is %s, barely moved; using the session did not keep it alive", extended)
+	}
+}
+
+func TestASessionCannotBeKeptAliveForEver(t *testing.T) {
+	store, ctx := open(t)
+
+	const password = "Integration-Test-2027"
+	user := account(t, store, ctx, "itest-forever", password, auth.RoleViewer)
+
+	// An idle window longer than the absolute lifetime, so every extension is
+	// clamped by the cap rather than by the window.
+	svc := service.New(store,
+		service.WithSessionTTL(time.Hour),
+		service.WithSessionMaxLifetime(2*time.Hour))
+
+	res, err := svc.Login(ctx, service.LoginRequest{Username: user.Username, Password: password})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Pretend the session was issued three hours ago — past its cap — while
+	// still inside its idle window, which is exactly the state continuous use
+	// would produce.
+	if _, err := store.Pool().Exec(ctx, `
+		UPDATE user_sessions
+		SET issued_at  = now() - INTERVAL '3 hours',
+		    expires_at = now() + INTERVAL '2 minutes'
+		WHERE user_id = $1`, user.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, ok, err := svc.ResolveSession(ctx, res.Token); !ok || err != nil {
+		t.Fatalf("resolve: ok=%v err=%v", ok, err)
+	}
+
+	var expires time.Time
+	if err := store.Pool().QueryRow(ctx,
+		`SELECT expires_at FROM user_sessions WHERE user_id = $1`, user.ID).Scan(&expires); err != nil {
+		t.Fatal(err)
+	}
+	if expires.After(time.Now().Add(10 * time.Minute)) {
+		t.Fatalf("expiry was pushed to %s, past the absolute lifetime; a session in "+
+			"continuous use would never end", expires)
+	}
+}
+
+func TestExtendingNeverShortensASession(t *testing.T) {
+	store, ctx := open(t)
+
+	const password = "Integration-Test-2027"
+	user := account(t, store, ctx, "itest-nonshorten", password, auth.RoleViewer)
+
+	svc := service.New(store, service.WithSessionTTL(time.Hour), service.WithSessionMaxLifetime(24*time.Hour))
+	res, err := svc.Login(ctx, service.LoginRequest{Username: user.Username, Password: password})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// A session with far longer left than the idle window would grant. Using
+	// it must not pull the expiry back to now+window.
+	if _, err := store.Pool().Exec(ctx,
+		`UPDATE user_sessions SET expires_at = now() + INTERVAL '20 hours' WHERE user_id = $1`,
+		user.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, ok, _ := svc.ResolveSession(ctx, res.Token); !ok {
+		t.Fatal("the session did not resolve")
+	}
+
+	var expires time.Time
+	if err := store.Pool().QueryRow(ctx,
+		`SELECT expires_at FROM user_sessions WHERE user_id = $1`, user.ID).Scan(&expires); err != nil {
+		t.Fatal(err)
+	}
+	if expires.Before(time.Now().Add(19 * time.Hour)) {
+		t.Fatalf("expiry was pulled back to %s; using a session shortened it", expires)
+	}
+}

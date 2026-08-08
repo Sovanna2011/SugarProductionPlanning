@@ -80,6 +80,17 @@ func Load() (Config, error) {
 	}
 	c.Auth.SessionTTL = ttl
 
+	maxLifetime, err := time.ParseDuration(env("SPP_SESSION_MAX_LIFETIME", "168h"))
+	if err != nil || maxLifetime <= 0 {
+		return c, fmt.Errorf("SPP_SESSION_MAX_LIFETIME must be a positive duration such as 168h, got %q",
+			os.Getenv("SPP_SESSION_MAX_LIFETIME"))
+	}
+	if maxLifetime < ttl {
+		return c, fmt.Errorf("SPP_SESSION_MAX_LIFETIME (%s) is shorter than SPP_SESSION_TTL (%s), "+
+			"which would end every session before its idle window", maxLifetime, ttl)
+	}
+	c.Auth.SessionMaxLifetime = maxLifetime
+
 	// Behind a reverse proxy every request appears to come from the proxy, so
 	// a per-client limit would become one global limit that the first attacker
 	// closes for everybody. Naming the proxy is what avoids that.

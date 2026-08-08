@@ -204,7 +204,8 @@ or change the bootstrap `src` in `webapp/index.html` to use the SAP CDN.
 | `SPP_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
 | `SPP_AUTH_MODE` | `none` | `none`, `local` or `proxy`. See [docs/security.md](docs/security.md) |
 | `SPP_AUTH_USER_HEADER` | `X-Forwarded-User` | Identity header under `proxy` mode |
-| `SPP_SESSION_TTL` | `12h` | How long a session lasts under `local` mode |
+| `SPP_SESSION_TTL` | `12h` | How long a session survives without being used. Using it pushes this out |
+| `SPP_SESSION_MAX_LIFETIME` | `168h` | However much it is used, a session ends here |
 | `SPP_SESSION_COOKIE` | `spp_session` | Session cookie name under `local` mode |
 | `SPP_SESSION_COOKIE_SECURE` | `false` | Mark the session cookie `Secure`. **Set this wherever the site is served over HTTPS** |
 | `SPP_TRUSTED_PROXIES` | *(none)* | Comma-separated addresses or CIDR blocks whose `X-Forwarded-For` is believed. Set it behind a reverse proxy, or every client looks like the proxy |

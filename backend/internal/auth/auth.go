@@ -188,8 +188,10 @@ type Config struct {
 	Sessions SessionResolver
 	// CookieName is the session cookie under ModeLocal.
 	CookieName string
-	// SessionTTL is how long a session issued by a login remains valid.
+	// SessionTTL is how long a session survives without being used.
 	SessionTTL time.Duration
+	// SessionMaxLifetime caps how long use can keep a session alive.
+	SessionMaxLifetime time.Duration
 	// CookieSecure marks the session cookie Secure. It must be on wherever
 	// the application is reached over HTTPS, and off for a plain-HTTP test
 	// deployment, or the browser will discard the cookie and no one can sign

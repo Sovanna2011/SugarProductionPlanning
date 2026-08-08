@@ -31,11 +31,16 @@ const (
 	// not a lock: guessing becomes hopeless while a person who mistyped their
 	// password is not shut out until an administrator rescues them.
 	loginLockFor = 15 * time.Minute
-	// defaultSessionTTL is how long a session lasts when nothing else says.
+	// defaultSessionTTL is how long a session survives without being used.
 	defaultSessionTTL = 12 * time.Hour
+	// defaultSessionMaxLifetime caps how long a session can be kept alive by
+	// use, however continuous. Without it a session extended on every request
+	// would never end, and "sign out everywhere" would be the only way to
+	// retire one.
+	defaultSessionMaxLifetime = 7 * 24 * time.Hour
 )
 
-// sessionTTL returns the configured session lifetime.
+// sessionTTL is how long a session survives without being used.
 func (s *Service) sessionTTL() time.Duration {
 	if s.authSessionTTL > 0 {
 		return s.authSessionTTL
@@ -43,9 +48,22 @@ func (s *Service) sessionTTL() time.Duration {
 	return defaultSessionTTL
 }
 
-// WithSessionTTL sets how long a session issued by a login remains valid.
+// sessionMaxLifetime caps how long use can keep a session alive.
+func (s *Service) sessionMaxLifetime() time.Duration {
+	if s.authSessionMaxLifetime > 0 {
+		return s.authSessionMaxLifetime
+	}
+	return defaultSessionMaxLifetime
+}
+
+// WithSessionTTL sets how long a session survives without being used.
 func WithSessionTTL(d time.Duration) Option {
 	return func(s *Service) { s.authSessionTTL = d }
+}
+
+// WithSessionMaxLifetime caps how long use can keep a session alive.
+func WithSessionMaxLifetime(d time.Duration) Option {
+	return func(s *Service) { s.authSessionMaxLifetime = d }
 }
 
 // LoginRequest is a sign-in attempt.
@@ -64,7 +82,8 @@ type LoginResult struct {
 	// Token is the session token. It is what the browser stores in a cookie
 	// and what an API client sends as a bearer token.
 	Token string `json:"token"`
-	// ExpiresAt is when the session stops working, regardless of activity.
+	// ExpiresAt is when the session stops working if it is not used again.
+	// Using it pushes this out; see ResolveSession.
 	ExpiresAt time.Time `json:"expiresAt"`
 	// User is the account that signed in.
 	User domain.User `json:"user"`
@@ -153,20 +172,53 @@ func (s *Service) Logout(ctx context.Context, token string) error {
 
 // ResolveSession implements auth.SessionResolver, turning a session token into
 // the identity the middleware attaches to the request.
+//
+// Using a session keeps it alive. A fixed expiry measured from sign-in signs
+// somebody out in the middle of a shift, halfway through posting a receipt,
+// for no reason connected to anything they did — so the window is an idle one,
+// pushed out while the session is in use and bounded by an absolute lifetime
+// so it cannot be kept alive for ever.
 func (s *Service) ResolveSession(ctx context.Context, token string) (auth.Identity, bool, error) {
 	if strings.TrimSpace(token) == "" {
 		return auth.Identity{}, false, nil
 	}
-	user, _, ok, err := s.store.SessionUser(ctx, auth.HashToken(token))
+	user, session, ok, err := s.store.SessionUser(ctx, auth.HashToken(token))
 	if err != nil || !ok {
 		return auth.Identity{}, false, err
 	}
+
+	s.extendSession(ctx, session)
+
 	return auth.Identity{
 		Subject:            user.Username,
 		Name:               user.DisplayName,
 		Roles:              user.Roles,
 		MustChangePassword: user.MustChangePassword,
 	}, true, nil
+}
+
+// extendSession pushes an in-use session's expiry out, at most once per half
+// window so this costs one write per session per several hours rather than one
+// per request.
+//
+// A failure here is logged nowhere and returned nowhere: the request is
+// already authenticated, and refusing it because the expiry could not be
+// refreshed would turn a housekeeping problem into an outage. The worst case
+// is that the session expires on time.
+func (s *Service) extendSession(ctx context.Context, session domain.UserSession) {
+	idle := s.sessionTTL()
+	wanted := time.Now().Add(idle)
+
+	// Never past the absolute lifetime, however continuously it is used.
+	if limit := session.IssuedAt.Add(s.sessionMaxLifetime()); wanted.After(limit) {
+		wanted = limit
+	}
+	// Only when it buys more than half a window, so this is not a write per
+	// request.
+	if wanted.Sub(session.ExpiresAt) < idle/2 {
+		return
+	}
+	_ = s.store.ExtendSession(ctx, session.ID, wanted)
 }
 
 // CurrentUser returns the signed-in account.

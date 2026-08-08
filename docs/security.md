@@ -61,7 +61,8 @@ authorised it has to mean something.
 
 ```bash
 SPP_AUTH_MODE=local
-SPP_SESSION_TTL=12h                  # how long a session lasts, whatever the activity
+SPP_SESSION_TTL=12h                  # how long a session survives without being used
+SPP_SESSION_MAX_LIFETIME=168h        # however much it is used, it ends here
 SPP_SESSION_COOKIE=spp_session       # the cookie name
 SPP_SESSION_COOKIE_SECURE=true       # required wherever the site is served over HTTPS
 ```
@@ -74,6 +75,13 @@ What it does:
   copy of the database yields no usable session. Revoking one — a sign-out, a
   password change, a deactivated account — takes effect on the next request
   rather than at the next expiry.
+- **Using a session keeps it alive.** `SPP_SESSION_TTL` is an idle window,
+  pushed out while somebody is working, so a shift is not interrupted by a
+  sign-out that has nothing to do with anything they did. The push happens at
+  most once per half window, so it costs one write per session per several
+  hours rather than one per request, and it never brings an expiry forward.
+  `SPP_SESSION_MAX_LIFETIME` caps the total, so a session cannot be kept alive
+  for ever.
 - **The session cookie is `HttpOnly` and `SameSite=Lax`**, so a cross-site
   scripting bug cannot read it and another site cannot cause the browser to
   send it on a form post. `Secure` is off by default because a plain-HTTP
@@ -242,10 +250,11 @@ is shown once and must be changed at first sign-in. That suits a site where
 the administrator and the user are on the same premises; it does not scale
 beyond that.
 
-**Sessions do not slide.** A session lasts `SPP_SESSION_TTL` from the moment it
-was issued, whatever the activity, so somebody working a long shift is signed
-out mid-shift. Twelve hours is chosen to cover one; a shorter TTL would need
-renewal on activity to be usable.
+**Sessions are bounded by an absolute lifetime, not just an idle one.** A
+session kept alive by continuous use still ends at `SPP_SESSION_MAX_LIFETIME`,
+so somebody who leaves has to sign in again rather than carrying a session
+indefinitely — but that is one week by default, which is a long time for a
+session to survive a laptop being stolen. Shorten both if that matters here.
 
 **No password expiry or history.** A password can be changed back to the
 previous one, and none of them age out. Both are deliberate: forced rotation
