@@ -1,0 +1,59 @@
+{
+	// Opening this repository in GitHub Codespaces brings the demo system up on
+	// its own and forwards it, so there is a real URL to sign in to without
+	// installing Docker, Go, PostgreSQL or anything else.
+	//
+	//   https://codespaces.new/Sovanna2011/SugarProductionPlanning
+	//
+	// The forwarded port starts Private — only you can reach it. To hand the
+	// link to somebody else, change its visibility to Public in the PORTS tab.
+	// Read what that means in docs/demo-user-test.md before you do: the demo
+	// accounts have a password published in this repository, so a public
+	// forward is a system anybody with the link can sign in to.
+	"name": "Sugar Production Planning — demo",
+
+	"image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+
+	"features": {
+		// The demo runs as containers, so the Codespace needs its own Docker.
+		"ghcr.io/devcontainers/features/docker-in-docker:2": {},
+		// Present so the from-source path and the tests work in here too.
+		"ghcr.io/devcontainers/features/go:1": {
+			"version": "1.24"
+		},
+		"ghcr.io/devcontainers/features/node:1": {
+			"version": "22"
+		}
+	},
+
+	"forwardPorts": [8080],
+	"portsAttributes": {
+		"8080": {
+			"label": "Sugar Production Planning",
+			"onAutoForward": "openBrowser"
+		},
+		"5432": {
+			"label": "PostgreSQL",
+			"onAutoForward": "silent"
+		}
+	},
+
+	// Building the image takes a few minutes the first time. Everything it does
+	// is safe to repeat, so a Codespace that is stopped and restarted comes
+	// back with the same data rather than seeding it twice.
+	"postStartCommand": "docker compose -f docker-compose.demo.yml up -d --build",
+
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"golang.go",
+				"ms-azuretools.vscode-docker"
+			]
+		}
+	},
+
+	"hostRequirements": {
+		"cpus": 2,
+		"memory": "8gb"
+	}
+}

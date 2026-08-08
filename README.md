@@ -65,7 +65,20 @@ docs/                    Data model, plan analysis, source documents
 
 ### The demo system
 
-One command, from nothing to a system you can sign in to and use:
+**Nothing to install:** open the repository in GitHub Codespaces and it starts
+itself.
+
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/Sovanna2011/SugarProductionPlanning)
+
+The Codespace brings the stack up, forwards port 8080 and opens it. That
+forward starts **Private** — only you can reach it. To hand the link to
+somebody else, set its visibility to Public in the PORTS tab, and understand
+what that means first: the demo accounts have a password published in this
+repository, so a public forward is a system anybody with the link can sign in
+to. Keep it private, or remove the demo accounts and create real ones.
+
+**On your own machine:** one command, from nothing to a system you can sign in
+to and use:
 
 ```bash
 docker compose -f docker-compose.demo.yml up --build

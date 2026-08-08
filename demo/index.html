@@ -405,6 +405,11 @@ footer {
 
 .linkcard .panel-body { gap: .5rem; }
 
+/* A URL written out in prose is one unbreakable token, which pushes a phone
+   viewport sideways. Let long links wrap rather than widen the page. */
+a { color: var(--accent); }
+p a, li a { overflow-wrap: anywhere; }
+
 .linkcue {
   font-family: var(--mono);
   font-size: .8125rem;
@@ -435,6 +440,16 @@ footer {
         <p class="note">From nothing to a system you can sign in to.</p>
       </div>
       <div class="panel-body">
+        <p class="note" style="margin-bottom:.5rem">
+          <strong>Nothing to install.</strong> Open the repository in a Codespace and it
+          starts itself, then forwards the running system at an HTTPS address:
+          <a href="https://codespaces.new/Sovanna2011/SugarProductionPlanning">codespaces.new/Sovanna2011/SugarProductionPlanning</a>.
+          The forward starts private to you; making it public in the PORTS tab is what
+          produces a link somebody else can open &mdash; and a system anybody with that
+          link can sign in to, on a password published in the repository.
+        </p>
+
+        <p class="note"><strong>Or on your own machine:</strong></p>
 <pre><code>git clone https://github.com/Sovanna2011/SugarProductionPlanning
 cd SugarProductionPlanning
 docker compose -f docker-compose.demo.yml up --build</code></pre>

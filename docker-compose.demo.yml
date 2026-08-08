@@ -50,10 +50,12 @@ services:
       SPP_AUTH_MODE: local
       SPP_OVERRIDE_ROLE: ADMIN
 
-      # Plain HTTP on localhost, so a Secure cookie would be discarded by the
-      # browser and the login would look broken. Never carry this to a real
-      # deployment.
-      SPP_SESSION_COOKIE_SECURE: "false"
+      # Off, because the default way to run this is plain HTTP on localhost,
+      # where a Secure cookie is silently discarded by the browser and the
+      # login looks broken for no visible reason. Somewhere the demo is
+      # reached over HTTPS — a Codespace forward, say — set it:
+      #     SPP_SESSION_COOKIE_SECURE=true docker compose -f docker-compose.demo.yml up
+      SPP_SESSION_COOKIE_SECURE: ${SPP_SESSION_COOKIE_SECURE:-false}
 
       # Which day of the season to load the stock position from. 2027-04-10 is
       # the raw sugar peak, 280 t under capacity.

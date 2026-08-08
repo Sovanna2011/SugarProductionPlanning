@@ -10,6 +10,20 @@ build it tries to get something done.
 
 ## Starting it
 
+The quickest way to get a URL somebody else can open is a Codespace on this
+repository — it installs nothing on your machine and gives the running system
+an HTTPS address:
+
+<https://codespaces.new/Sovanna2011/SugarProductionPlanning>
+
+The forwarded port starts Private, so only you can reach it. Making it Public
+in the PORTS tab is what produces a shareable link — and a system anybody with
+that link can sign in to, using a password published in this repository. That
+is fine for an afternoon of user testing on invented data. It is not fine once
+the database holds anything real; see the last section.
+
+On your own machine:
+
 ```bash
 docker compose -f docker-compose.demo.yml up --build     # then open http://localhost:8080
 ```
