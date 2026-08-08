@@ -1,0 +1,323 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A new push supersedes an in-flight run for the same branch.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (vet, format, unit tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Verify formatting
+        working-directory: backend
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "These files need gofmt:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Vet
+        working-directory: backend
+        # Vet the integration build too, so a broken tagged test cannot hide.
+        run: |
+          go vet ./...
+          go vet -tags=integration ./...
+
+      - name: Unit tests
+        working-directory: backend
+        run: go test -race ./...
+
+      - name: Build
+        working-directory: backend
+        run: go build ./...
+
+  integration:
+    name: Migrations and integration tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: spp
+          POSTGRES_PASSWORD: spp
+          POSTGRES_DB: spp_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U spp -d spp_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # cmd/migrate reads SPP_DATABASE_URL; the integration tests prefer
+      # SPP_TEST_DATABASE_URL. Both point at the service container.
+      SPP_DATABASE_URL: postgres://spp:spp@localhost:5432/spp_test?sslmode=disable
+      SPP_TEST_DATABASE_URL: postgres://spp:spp@localhost:5432/spp_test?sslmode=disable
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Apply migrations
+        working-directory: backend
+        run: go run ./cmd/migrate
+
+      - name: Re-apply migrations (must be a no-op)
+        working-directory: backend
+        run: go run ./cmd/migrate
+
+      # Covers the SQL, the seeded season reconciling with the summary report,
+      # the capacity rules against real master data, and the derived balances.
+      - name: Integration tests
+        working-directory: backend
+        run: go test -tags=integration -count=1 ./...
+
+  seed-drift:
+    name: Season seed matches the workbook
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install openpyxl
+        run: pip install --quiet openpyxl
+
+      # The generator asserts every season total against the summary report, so
+      # it fails outright if the workbook and the seed have diverged.
+      - name: Regenerate the season seed
+        run: python3 scripts/generate_season_seed.py
+
+      - name: Check the committed seed is up to date
+        run: |
+          if ! git diff --exit-code -- backend/migrations/0006_seed_season_2026_2027.sql; then
+            echo
+            echo "The committed seed does not match what the workbook generates."
+            echo "Run: python3 scripts/generate_season_seed.py"
+            exit 1
+          fi
+
+  docker:
+    name: Container image
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: spp
+          POSTGRES_PASSWORD: spp
+          POSTGRES_DB: spp
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U spp -d spp"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate the compose file
+        run: docker compose config --quiet
+
+      - name: Build the image
+        run: docker build -t kss-spp:ci .
+
+      # Proves the image actually runs: migrations apply, the API answers and
+      # the bundled dashboard is served. Host networking so the container can
+      # reach the PostgreSQL service on the runner.
+      - name: Start the container
+        run: |
+          docker run -d --name spp --network host \
+            -e SPP_DATABASE_URL='postgres://spp:spp@127.0.0.1:5432/spp?sslmode=disable' \
+            -e SPP_ADDR=':8080' \
+            kss-spp:ci
+
+      - name: Wait for the API
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8080/api/v1/health >/dev/null 2>&1; then
+              echo "API is up after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "API did not come up"
+          docker logs spp
+          exit 1
+
+      - name: Check the seeded data and the dashboard
+        run: |
+          # Migrations ran inside the container, so the season is present.
+          locations=$(curl -fsS http://127.0.0.1:8080/api/v1/master/storage-locations | grep -o '"storageCode"' | wc -l)
+          echo "storage locations served: $locations"
+          test "$locations" -ge 8
+
+          # The UI5 runtime is bundled, so the page can actually bootstrap.
+          curl -fsS -o /dev/null http://127.0.0.1:8080/index.html
+          curl -fsS -o /dev/null http://127.0.0.1:8080/resources/sap-ui-core.js
+
+          # With no authentication configured, nothing is gated.
+          curl -fsS -o /dev/null http://127.0.0.1:8080/api/v1/factories
+
+      # The login system is only real if the shipped image can serve it: the
+      # seeding command, the sign-in, and the refusal that follows from a role.
+      - name: Check the login system in the image
+        run: |
+          docker exec spp spp-seed-users -demo
+
+          docker rm -f spp
+          docker run -d --name spp-auth --network host \
+            -e SPP_DATABASE_URL='postgres://spp:spp@127.0.0.1:5432/spp?sslmode=disable' \
+            -e SPP_ADDR=':8080' \
+            -e SPP_AUTH_MODE=local \
+            -e SPP_OVERRIDE_ROLE=ADMIN \
+            kss-spp:ci
+          # An `if`, not `curl ... && break`: the step runs under `set -e`, where
+          # a failing && list is fatal, so the very first poll before the server
+          # is listening would end the step.
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8080/api/v1/health >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+
+          # Anonymous is refused, and the login screen's own calls are not.
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/api/v1/factories)" = 401
+          curl -fsS -o /dev/null http://127.0.0.1:8080/api/v1/auth/config
+          curl -fsS -o /dev/null http://127.0.0.1:8080/index.html
+
+          # A viewer reads and does not write.
+          token=$(curl -fsS -X POST http://127.0.0.1:8080/api/v1/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"viewer","password":"Demo-Sugar-2027"}' \
+            | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+          test -n "$token"
+          curl -fsS -o /dev/null -H "Authorization: Bearer $token" http://127.0.0.1:8080/api/v1/factories
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
+            -d '{"factoryId":1,"movementDate":"2027-02-15T00:00:00Z","movementType":"WAREHOUSE_RECEIPT","storageCode":"RAW-WH01","productCode":"RAW-SUGAR","packagingCode":"PKG-BULK","weightQuantity":1}' \
+            http://127.0.0.1:8080/api/v1/inventory/movements)
+          test "$code" = 403
+
+      # The demo compose file is the one somebody evaluating this actually
+      # runs, and it has its own entrypoint that seeds before serving. Running
+      # it here is the only place that path is exercised, since it is the whole
+      # deliverable for a user test.
+      - name: Check the demo entrypoint
+        run: |
+          docker compose -f docker-compose.demo.yml config --quiet
+
+          docker rm -f spp-auth || true
+          psql() { docker run --rm --network host -e PGPASSWORD=spp postgres:16 psql -h 127.0.0.1 -U spp "$@"; }
+          psql -d postgres -qc 'DROP DATABASE IF EXISTS spp_demo' -c 'CREATE DATABASE spp_demo'
+
+          # Twice, from empty: the second run proves a restart neither
+          # duplicates the seeded data nor exits non-zero.
+          for run in 1 2; do
+            docker rm -f spp-demo 2>/dev/null || true
+            docker run -d --name spp-demo --network host \
+              --entrypoint /usr/local/bin/spp-demo \
+              -e SPP_DATABASE_URL='postgres://spp:spp@127.0.0.1:5432/spp_demo?sslmode=disable' \
+              -e SPP_ADDR=':8080' \
+              -e SPP_AUTH_MODE=local \
+              -e SPP_OVERRIDE_ROLE=ADMIN \
+              kss-spp:ci
+
+            for i in $(seq 1 60); do
+              if curl -fsS http://127.0.0.1:8080/api/v1/health >/dev/null 2>&1; then
+                break
+              fi
+              sleep 1
+            done
+            echo "--- demo run $run came up ---"
+          done
+
+          # A demo nobody can sign in to is not a demo.
+          token=$(curl -fsS -X POST http://127.0.0.1:8080/api/v1/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"admin","password":"Demo-Sugar-2027"}' \
+            | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+          test -n "$token"
+
+          # And one with no stock in it shows every warehouse at 0%.
+          dashboard=$(curl -fsS -H "Authorization: Bearer $token" \
+            'http://127.0.0.1:8080/api/v1/dashboard/storage-capacity?factoryId=1')
+          echo "$dashboard" | grep -q '"RAW-POOL"'
+          lines=$(curl -fsS -H "Authorization: Bearer $token" \
+            'http://127.0.0.1:8080/api/v1/inventory/balances?nonZeroOnly=true' \
+            | grep -o '"storageCode"' | wc -l)
+          echo "stock lines after two runs: $lines"
+          if [ "$lines" -ne 14 ]; then
+            echo "Expected 14 stock lines. Two runs producing 28 means the second"
+            echo "seeded on top of the first, so a container restart doubles the"
+            echo "demo position."
+            exit 1
+          fi
+
+      # Every container, because any one of them can be the reason a step failed.
+      - name: Container logs
+        if: always()
+        run: |
+          docker logs spp || true
+          docker logs spp-auth || true
+          docker logs spp-demo || true
+
+  webapp:
+    name: UI5 dashboard build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Check the build produced a bootable app
+        # index.html bootstraps from a relative resources/ path, so a build
+        # without the runtime bundled would produce a dist that cannot start.
+        run: |
+          test -f dist/index.html
+          test -f dist/Component-preload.js
+          test -f dist/manifest.json
+          test -f dist/resources/sap-ui-core.js
+
+      - name: App-only build
+        run: npm run build:app

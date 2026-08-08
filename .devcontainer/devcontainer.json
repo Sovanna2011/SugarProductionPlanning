@@ -1,0 +1,79 @@
+{
+	// Opening this repository in GitHub Codespaces brings the demo system up on
+	// its own and forwards it, so there is a real URL to sign in to without
+	// installing Docker, Go, PostgreSQL or anything else.
+	//
+	//   https://codespaces.new/Sovanna2011/SugarProductionPlanning
+	//
+	// The forwarded port starts Private — only you can reach it. To hand the
+	// link to somebody else, change its visibility to Public in the PORTS tab.
+	// Read what that means in docs/demo-user-test.md before you do: the demo
+	// accounts have a password published in this repository, so a public
+	// forward is a system anybody with the link can sign in to.
+	"name": "Sugar Production Planning — demo",
+
+	"image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+
+	"features": {
+		// The demo runs as containers, so the Codespace needs its own Docker.
+		"ghcr.io/devcontainers/features/docker-in-docker:2": {},
+		// Present so the from-source path and the tests work in here too.
+		"ghcr.io/devcontainers/features/go:1": {
+			"version": "1.24"
+		},
+		"ghcr.io/devcontainers/features/node:1": {
+			"version": "22"
+		}
+	},
+
+	// A Codespace forward is HTTPS, so the session cookie should be marked
+	// Secure. The demo compose file leaves it off by default because the usual
+	// way to run it is plain HTTP on localhost, where a Secure cookie is
+	// silently dropped and the login just looks broken.
+	"containerEnv": {
+		"SPP_SESSION_COOKIE_SECURE": "true"
+	},
+
+	"forwardPorts": [8080],
+	"portsAttributes": {
+		"8080": {
+			"label": "Sugar Production Planning",
+			"onAutoForward": "openBrowser"
+		},
+		"5432": {
+			"label": "PostgreSQL",
+			"onAutoForward": "silent"
+		}
+	},
+
+	// Build once, when the Codespace is created — it takes a few minutes, and
+	// waitFor holds "ready" until it is done so the browser does not open on a
+	// port nothing is listening to yet.
+	"postCreateCommand": "docker compose -f docker-compose.demo.yml build",
+	"waitFor": "postCreateCommand",
+
+	// Start on every boot, then make the port reachable and print the link.
+	// Everything both commands do is safe to repeat, so a Codespace that is
+	// stopped and resumed comes back the same rather than seeding twice.
+	//
+	// Sharing is automatic because a demo nobody else can open is not much of
+	// a demo. It is also loud about what it did and reversible in one command
+	// — ./scripts/share.sh private — because "public" here means no account
+	// and no permission check, on accounts whose password is in this
+	// repository. Read scripts/share.sh before pointing this at real data.
+	"postStartCommand": "docker compose -f docker-compose.demo.yml up -d && ./scripts/share.sh",
+
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"golang.go",
+				"ms-azuretools.vscode-docker"
+			]
+		}
+	},
+
+	"hostRequirements": {
+		"cpus": 2,
+		"memory": "8gb"
+	}
+}

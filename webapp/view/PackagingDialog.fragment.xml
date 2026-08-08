@@ -1,0 +1,75 @@
+<core:FragmentDefinition
+	xmlns="sap.m"
+	xmlns:core="sap.ui.core"
+	xmlns:f="sap.ui.layout.form">
+
+	<Dialog
+		id="packagingDialog"
+		title="{edit>/title}"
+		contentWidth="32rem"
+		draggable="true">
+
+		<content>
+			<f:SimpleForm
+				layout="ResponsiveGridLayout"
+				editable="true"
+				labelSpanXL="5" labelSpanL="5" labelSpanM="5" labelSpanS="12"
+				columnsXL="1" columnsL="1">
+				<f:content>
+
+					<Label text="{i18n>code}" required="true"/>
+					<Input
+						value="{edit>/code}"
+						editable="{= !${edit>/isUpdate} }"
+						placeholder="PKG-25KG"/>
+
+					<Label text="{i18n>description}" required="true"/>
+					<Input value="{edit>/description}" placeholder="25 KG Bag"/>
+
+					<Label text="{i18n>bulk}"/>
+					<Switch state="{edit>/isBulk}" change=".onBulkToggled"/>
+
+					<Label text="{i18n>netWeight}" required="{= !${edit>/isBulk} }"/>
+					<Input
+						value="{edit>/netWeight}"
+						type="Number"
+						enabled="{= !${edit>/isBulk} }"/>
+
+					<Label text="{i18n>unit}"/>
+					<Select
+						selectedKey="{edit>/netWeightUom}"
+						enabled="{= !${edit>/isBulk} }"
+						width="100%">
+						<core:Item key="KG" text="KG"/>
+						<core:Item key="TON" text="TON"/>
+					</Select>
+
+					<Label text="{i18n>status}"/>
+					<Select selectedKey="{edit>/status}" width="100%">
+						<core:Item key="ACTIVE" text="{i18n>active}"/>
+						<core:Item key="INACTIVE" text="{i18n>inactive}"/>
+					</Select>
+
+				</f:content>
+			</f:SimpleForm>
+
+			<!-- The conversion factor is derived server side; showing it here
+			     makes that visible before saving. -->
+			<MessageStrip
+				class="sapUiSmallMargin"
+				type="Information"
+				showIcon="true"
+				text="{
+					parts: ['edit>/netWeight', 'edit>/netWeightUom', 'edit>/isBulk'],
+					formatter: '.formatter.conversionPreview'
+				}"/>
+		</content>
+
+		<beginButton>
+			<Button text="{i18n>save}" type="Emphasized" press=".onSavePackaging"/>
+		</beginButton>
+		<endButton>
+			<Button text="{i18n>cancel}" press=".onCloseDialog"/>
+		</endButton>
+	</Dialog>
+</core:FragmentDefinition>

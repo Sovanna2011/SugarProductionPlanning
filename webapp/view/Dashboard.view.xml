@@ -1,0 +1,370 @@
+<mvc:View
+	controllerName="kss.spp.controller.Dashboard"
+	xmlns="sap.m"
+	xmlns:mvc="sap.ui.core.mvc"
+	xmlns:f="sap.f"
+	xmlns:core="sap.ui.core"
+	xmlns:l="sap.ui.layout"
+	displayBlock="true"
+	height="100%">
+
+	<Page
+		id="page"
+		title="{i18n>appTitle}"
+		showHeader="true"
+		busy="{app>/busy}"
+		busyIndicatorDelay="0"
+		class="sppPage">
+
+		<headerContent>
+			<Text text="{app>/dashboard/factoryName}" class="sppHeaderText"/>
+			<Button
+				icon="sap-icon://compare"
+				text="{i18n>planVsActualTitle}"
+				tooltip="{i18n>planVsActualTooltip}"
+				press=".onOpenPlanVsActual"/>
+			<Button
+				icon="sap-icon://cause"
+				text="{i18n>remeltTitle}"
+				tooltip="{i18n>remeltTooltip}"
+				press=".onOpenRemelt"/>
+			<Button
+				icon="sap-icon://settings"
+				text="{i18n>masterDataTitle}"
+				tooltip="{i18n>masterDataTooltip}"
+				press=".onOpenMasterData"/>
+			<Button
+				icon="sap-icon://refresh"
+				tooltip="{i18n>refresh}"
+				press=".onRefresh"/>
+			<Button
+				id="userButton"
+				icon="sap-icon://person-placeholder"
+				text="{app>/session/displayName}"
+				tooltip="{i18n>signedInTitle}"
+				visible="{app>/session/loginRequired}"
+				press=".onOpenUserMenu"/>
+		</headerContent>
+
+		<content>
+
+			<!-- ================= Filters (requirement section 20) ============ -->
+			<Panel headerText="{i18n>filters}" expandable="true" expanded="true" class="sppPanel">
+				<l:Grid defaultSpan="XL2 L3 M4 S12" hSpacing="1" vSpacing="1">
+
+					<VBox>
+						<Label text="{i18n>factory}" labelFor="factorySelect"/>
+						<Select
+							id="factorySelect"
+							width="100%"
+							items="{app>/factories}"
+							selectedKey="{app>/filters/factoryId}"
+							change=".onFilterChange">
+							<core:Item key="{app>id}" text="{app>code} — {app>name}"/>
+						</Select>
+					</VBox>
+
+					<VBox>
+						<Label text="{i18n>date}" labelFor="dateFilter"/>
+						<DatePicker
+							id="dateFilter"
+							width="100%"
+							valueFormat="yyyy-MM-dd"
+							displayFormat="dd MMM yyyy"
+							value="{app>/filters/date}"
+							change=".onFilterChange"/>
+					</VBox>
+
+					<VBox>
+						<Label text="{i18n>storageType}" labelFor="storageTypeSelect"/>
+						<Select
+							id="storageTypeSelect"
+							width="100%"
+							selectedKey="{app>/filters/storageType}"
+							change=".onFilterChange"
+							items="{
+								path: 'app>/storageTypes',
+								templateShareable: false
+							}">
+							<core:Item key="{app>code}" text="{app>name}"/>
+						</Select>
+					</VBox>
+
+					<VBox>
+						<Label text="{i18n>warehouse}" labelFor="storageSelect"/>
+						<Select
+							id="storageSelect"
+							width="100%"
+							selectedKey="{app>/filters/storageCode}"
+							change=".onFilterChange"
+							items="{
+								path: 'app>/storageLocations',
+								templateShareable: false
+							}">
+							<core:Item key="{app>storageCode}" text="{app>storageName}"/>
+						</Select>
+					</VBox>
+
+					<VBox>
+						<Label text="{i18n>product}" labelFor="productSelect"/>
+						<Select
+							id="productSelect"
+							width="100%"
+							selectedKey="{app>/filters/productCode}"
+							change=".onFilterChange"
+							items="{
+								path: 'app>/products',
+								templateShareable: false
+							}">
+							<core:Item key="{app>code}" text="{app>name}"/>
+						</Select>
+					</VBox>
+
+					<VBox>
+						<Label text="{i18n>packaging}" labelFor="packagingSelect"/>
+						<Select
+							id="packagingSelect"
+							width="100%"
+							selectedKey="{app>/filters/packagingCode}"
+							change=".onFilterChange"
+							items="{
+								path: 'app>/packagingTypes',
+								templateShareable: false
+							}">
+							<core:Item key="{app>code}" text="{app>description}"/>
+						</Select>
+					</VBox>
+
+				</l:Grid>
+
+				<Toolbar>
+					<ToolbarSpacer/>
+					<Button text="{i18n>clearFilters}" press=".onClearFilters"/>
+					<Button text="{i18n>apply}" type="Emphasized" press=".onRefresh"/>
+				</Toolbar>
+			</Panel>
+
+			<MessageStrip
+				text="{app>/error}"
+				type="Error"
+				showIcon="true"
+				class="sapUiSmallMargin"
+				visible="{= !!${app>/error} }"/>
+
+			<!-- ================= Pooled capacity headline ==================== -->
+			<Panel headerText="{i18n>pooledCapacity}" class="sppPanel"
+				visible="{= ${app>/dashboard/groups}.length > 0 }">
+				<l:Grid defaultSpan="XL4 L4 M6 S12" hSpacing="1" vSpacing="1"
+					content="{
+						path: 'app>/dashboard/groups',
+						templateShareable: false
+					}">
+					<VBox class="sppCard">
+						<HBox justifyContent="SpaceBetween" alignItems="Center">
+							<Title level="H4" text="{app>groupName}"/>
+							<ObjectStatus
+								text="{app>utilization/band/name}"
+								state="{app>utilization/band/uiState}"
+								inverted="true"/>
+						</HBox>
+						<Text text="{app>remark}" class="sppMuted"/>
+						<ProgressIndicator
+							class="sppBar"
+							percentValue="{
+								path: 'app>utilization/utilizationPercentage',
+								formatter: '.formatter.barPercent'
+							}"
+							displayValue="{
+								parts: ['app>utilization/utilizationPercentage'],
+								formatter: '.formatter.percent'
+							}"
+							state="{app>utilization/band/uiState}"
+							showValue="true"/>
+						<HBox justifyContent="SpaceBetween" class="sppFigures">
+							<VBox>
+								<Label text="{i18n>current}"/>
+								<Text text="{
+									parts: ['app>utilization/currentStock', 'app>utilization/uom'],
+									formatter: '.formatter.qty'
+								}"/>
+							</VBox>
+							<VBox>
+								<Label text="{i18n>capacity}"/>
+								<Text text="{
+									parts: ['app>utilization/capacity', 'app>utilization/uom'],
+									formatter: '.formatter.qty'
+								}"/>
+							</VBox>
+							<VBox>
+								<Label text="{i18n>available}"/>
+								<Text text="{
+									parts: ['app>utilization/availableCapacity', 'app>utilization/uom'],
+									formatter: '.formatter.qty'
+								}"/>
+							</VBox>
+						</HBox>
+						<Text text="{app>memberCodes}" class="sppMuted"/>
+						<Toolbar visible="{app>hasPlan}">
+							<ToolbarSpacer/>
+							<Button
+								text="{i18n>projectCapacity}"
+								icon="sap-icon://timeline-chart"
+								press=".onProject"/>
+						</Toolbar>
+					</VBox>
+				</l:Grid>
+			</Panel>
+
+			<!-- ================= Capacity alerts (section 18) ================= -->
+			<Panel headerText="{i18n>alerts}" class="sppPanel"
+				visible="{= ${app>/dashboard/alerts}.length > 0 }">
+				<List
+					items="{
+						path: 'app>/dashboard/alerts',
+						templateShareable: false
+					}"
+					noDataText="{i18n>noAlerts}"
+					showSeparators="Inner">
+					<StandardListItem
+						title="{app>scopeName}"
+						description="{app>message}"
+						info="{app>severity}"
+						infoState="{app>uiState}"
+						icon="sap-icon://alert"/>
+				</List>
+			</Panel>
+
+			<!-- ================= Storage locations by type ==================== -->
+			<Panel headerText="{i18n>storageLocations}" class="sppPanel">
+				<!-- Two per row at most: each card carries a product table that
+				     becomes unreadable in a narrow column. -->
+				<l:Grid defaultSpan="XL6 L6 M12 S12" hSpacing="1" vSpacing="1"
+					content="{
+						path: 'app>/dashboard/storages',
+						templateShareable: false
+					}">
+					<VBox class="sppCard">
+						<HBox justifyContent="SpaceBetween" alignItems="Center">
+							<VBox>
+								<Title level="H4" text="{app>storageName}"/>
+								<Text text="{app>storageCode} · {app>storageTypeName}" class="sppMuted"/>
+							</VBox>
+							<ObjectStatus
+								text="{app>utilization/band/name}"
+								state="{app>utilization/band/uiState}"
+								inverted="true"/>
+						</HBox>
+
+						<ProgressIndicator
+							class="sppBar"
+							percentValue="{
+								path: 'app>utilization/utilizationPercentage',
+								formatter: '.formatter.barPercent'
+							}"
+							displayValue="{
+								parts: ['app>utilization/utilizationPercentage'],
+								formatter: '.formatter.percent'
+							}"
+							state="{app>utilization/band/uiState}"
+							showValue="true"/>
+
+						<HBox justifyContent="SpaceBetween" class="sppFigures">
+							<VBox>
+								<Label text="{i18n>current}"/>
+								<Text text="{
+									parts: ['app>utilization/currentStock', 'app>utilization/uom'],
+									formatter: '.formatter.qty'
+								}"/>
+							</VBox>
+							<VBox>
+								<Label text="{i18n>capacity}"/>
+								<Text text="{
+									parts: ['app>utilization/capacity', 'app>utilization/uom'],
+									formatter: '.formatter.qty'
+								}"/>
+							</VBox>
+							<VBox>
+								<Label text="{i18n>safeCapacity}"/>
+								<Text text="{
+									parts: ['app>utilization/safeCapacity', 'app>utilization/uom'],
+									formatter: '.formatter.qty'
+								}"/>
+							</VBox>
+							<VBox>
+								<Label text="{i18n>available}"/>
+								<Text text="{
+									parts: ['app>utilization/availableCapacity', 'app>utilization/uom'],
+									formatter: '.formatter.qty'
+								}"/>
+							</VBox>
+						</HBox>
+
+						<!-- Product + packaging breakdown (sections 4, 12) -->
+						<Table
+							items="{
+								path: 'app>products',
+								templateShareable: false
+							}"
+							visible="{= ${app>products} !== undefined &amp;&amp; ${app>products}.length > 0 }"
+							class="sppProductTable"
+							fixedLayout="false">
+							<columns>
+								<Column><Text text="{i18n>product}"/></Column>
+								<Column><Text text="{i18n>packaging}"/></Column>
+								<Column hAlign="End"><Text text="{i18n>stockPackages}"/></Column>
+								<Column hAlign="End"><Text text="{i18n>stockWeight}"/></Column>
+								<Column hAlign="End"><Text text="{i18n>maximum}"/></Column>
+								<Column hAlign="End"><Text text="{i18n>spacesLeft}"/></Column>
+								<Column hAlign="End"><Text text="{i18n>utilization}"/></Column>
+							</columns>
+							<items>
+								<ColumnListItem>
+									<cells>
+										<Text text="{app>productName}"/>
+										<Text text="{app>packagingDescription}"/>
+										<Text text="{
+											path: 'app>currentPackages',
+											formatter: '.formatter.packages'
+										}"/>
+										<Text text="{
+											parts: ['app>currentWeight'],
+											formatter: '.formatter.tons'
+										}"/>
+										<Text text="{
+											parts: ['app>maximumPackages', 'app>maximumWeight'],
+											formatter: '.formatter.maximum'
+										}"/>
+										<Text text="{
+											parts: ['app>availablePackageSpaces', 'app>availableWeightCapacity'],
+											formatter: '.formatter.maximum'
+										}"/>
+										<ObjectStatus
+											text="{
+												parts: ['app>utilizationPercentage'],
+												formatter: '.formatter.percent'
+											}"
+											state="{app>band/uiState}"/>
+									</cells>
+								</ColumnListItem>
+							</items>
+						</Table>
+
+						<Text text="{app>remark}" class="sppMuted sppRemark"
+							visible="{= !!${app>remark} }"/>
+
+						<!-- Only scopes that carry a daily storage plan can be
+						     projected forward. -->
+						<Toolbar visible="{app>hasPlan}">
+							<ToolbarSpacer/>
+							<Button
+								text="{i18n>projectCapacity}"
+								icon="sap-icon://timeline-chart"
+								press=".onProject"/>
+						</Toolbar>
+					</VBox>
+				</l:Grid>
+			</Panel>
+
+		</content>
+	</Page>
+</mvc:View>

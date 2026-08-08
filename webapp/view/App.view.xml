@@ -1,0 +1,10 @@
+<mvc:View
+	controllerName="kss.spp.controller.App"
+	xmlns="sap.m"
+	xmlns:mvc="sap.ui.core.mvc"
+	displayBlock="true"
+	height="100%">
+
+	<!-- Routing target: the router swaps pages into this App. -->
+	<App id="app" busy="{app>/appBusy}" busyIndicatorDelay="0"/>
+</mvc:View>

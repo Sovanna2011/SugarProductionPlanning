@@ -1,0 +1,327 @@
+<mvc:View
+	controllerName="kss.spp.controller.MasterData"
+	xmlns="sap.m"
+	xmlns:mvc="sap.ui.core.mvc"
+	xmlns:core="sap.ui.core"
+	displayBlock="true"
+	height="100%">
+
+	<Page
+		id="masterDataPage"
+		title="{i18n>masterDataTitle}"
+		showNavButton="true"
+		navButtonPress=".onNavBack"
+		busy="{app>/busy}"
+		busyIndicatorDelay="0">
+
+		<headerContent>
+			<Button
+				icon="sap-icon://refresh"
+				tooltip="{i18n>refresh}"
+				press=".onRefresh"/>
+			<Button
+				id="userButton"
+				icon="sap-icon://person-placeholder"
+				text="{app>/session/displayName}"
+				tooltip="{i18n>signedInTitle}"
+				visible="{app>/session/loginRequired}"
+				press=".onOpenUserMenu"/>
+		</headerContent>
+
+		<content>
+			<MessageStrip
+				text="{i18n>masterDataHint}"
+				type="Information"
+				showIcon="true"
+				class="sapUiSmallMargin"/>
+
+			<IconTabBar id="masterTabs" expanded="true" class="sapUiResponsiveContentPadding">
+
+				<items>
+
+					<!-- ============ Storage locations (sections 1, 3) ========= -->
+					<IconTabFilter
+						key="locations"
+						icon="sap-icon://building"
+						text="{i18n>tabStorageLocations}"
+						count="{= ${app>/master/storageLocations}.length }">
+
+						<Table
+							id="locationTable"
+							items="{
+								path: 'app>/master/storageLocations',
+								templateShareable: false
+							}"
+							growing="true"
+							growingThreshold="25"
+							fixedLayout="false">
+
+							<headerToolbar>
+								<Toolbar>
+									<Title text="{i18n>tabStorageLocations}"/>
+									<ToolbarSpacer/>
+									<Button
+										text="{i18n>newLocation}"
+										icon="sap-icon://add"
+										type="Emphasized"
+										press=".onNewLocation"
+										enabled="{app>/session/permissions/editMasterData}"/>
+								</Toolbar>
+							</headerToolbar>
+
+							<columns>
+								<Column><Text text="{i18n>code}"/></Column>
+								<Column><Text text="{i18n>name}"/></Column>
+								<Column><Text text="{i18n>storageType}"/></Column>
+								<Column hAlign="End"><Text text="{i18n>capacity}"/></Column>
+								<Column hAlign="End"><Text text="{i18n>safePercent}"/></Column>
+								<Column><Text text="{i18n>status}"/></Column>
+								<Column hAlign="End" width="6rem"><Text text=""/></Column>
+							</columns>
+
+							<items>
+								<ColumnListItem>
+									<cells>
+										<ObjectIdentifier title="{app>storageCode}"/>
+										<Text text="{app>storageName}"/>
+										<Text text="{app>storageTypeName}"/>
+										<Text text="{
+											parts: ['app>physicalCapacity', 'app>capacityUom'],
+											formatter: '.formatter.qty'
+										}"/>
+										<Text text="{
+											path: 'app>safeCapacityPercentage',
+											formatter: '.formatter.percent'
+										}"/>
+										<ObjectStatus
+											text="{app>status}"
+											state="{= ${app>status} === 'ACTIVE' ? 'Success' : 'None' }"/>
+										<Button
+											icon="sap-icon://edit"
+											tooltip="{i18n>edit}"
+											press=".onEditLocation"
+										enabled="{app>/session/permissions/editMasterData}"/>
+									</cells>
+								</ColumnListItem>
+							</items>
+						</Table>
+					</IconTabFilter>
+
+					<!-- ==== Warehouse + product + packaging (sections 4, 12) === -->
+					<IconTabFilter
+						key="capacities"
+						icon="sap-icon://product"
+						text="{i18n>tabProductCapacity}"
+						count="{= ${app>/master/capacities}.length }">
+
+						<Table
+							id="capacityTable"
+							items="{
+								path: 'app>/master/capacities',
+								templateShareable: false
+							}"
+							growing="true"
+							growingThreshold="25"
+							fixedLayout="false">
+
+							<headerToolbar>
+								<Toolbar>
+									<Title text="{i18n>tabProductCapacity}"/>
+									<ToolbarSpacer/>
+									<Button
+										text="{i18n>newCapacity}"
+										icon="sap-icon://add"
+										type="Emphasized"
+										press=".onNewCapacity"
+										enabled="{app>/session/permissions/editMasterData}"/>
+								</Toolbar>
+							</headerToolbar>
+
+							<columns>
+								<Column><Text text="{i18n>warehouse}"/></Column>
+								<Column><Text text="{i18n>product}"/></Column>
+								<Column><Text text="{i18n>packaging}"/></Column>
+								<Column hAlign="End"><Text text="{i18n>maxPackages}"/></Column>
+								<Column hAlign="End"><Text text="{i18n>maxWeight}"/></Column>
+								<Column><Text text="{i18n>remark}"/></Column>
+								<Column hAlign="End" width="6rem"><Text text=""/></Column>
+							</columns>
+
+							<items>
+								<ColumnListItem>
+									<cells>
+										<ObjectIdentifier title="{app>storageCode}" text="{app>storageName}"/>
+										<Text text="{app>productName}"/>
+										<Text text="{app>packagingDescription}"/>
+										<Text text="{
+											path: 'app>maximumPackageQuantity',
+											formatter: '.formatter.packages'
+										}"/>
+										<Text text="{
+											path: 'app>maximumWeightQuantity',
+											formatter: '.formatter.tons'
+										}"/>
+										<Text text="{app>remark}" class="sppMuted"/>
+										<Button
+											icon="sap-icon://edit"
+											tooltip="{i18n>edit}"
+											press=".onEditCapacity"
+										enabled="{app>/session/permissions/editMasterData}"/>
+									</cells>
+								</ColumnListItem>
+							</items>
+						</Table>
+					</IconTabFilter>
+
+					<!-- ============ Packaging master (section 5) ============== -->
+					<IconTabFilter
+						key="packaging"
+						icon="sap-icon://sales-order-item"
+						text="{i18n>tabPackaging}"
+						count="{= ${app>/master/packagingTypes}.length }">
+
+						<Table
+							id="packagingTable"
+							items="{
+								path: 'app>/master/packagingTypes',
+								templateShareable: false
+							}"
+							fixedLayout="false">
+
+							<headerToolbar>
+								<Toolbar>
+									<Title text="{i18n>tabPackaging}"/>
+									<ToolbarSpacer/>
+									<Button
+										text="{i18n>newPackaging}"
+										icon="sap-icon://add"
+										type="Emphasized"
+										press=".onNewPackaging"
+										enabled="{app>/session/permissions/editMasterData}"/>
+								</Toolbar>
+							</headerToolbar>
+
+							<columns>
+								<Column><Text text="{i18n>code}"/></Column>
+								<Column><Text text="{i18n>description}"/></Column>
+								<Column hAlign="End"><Text text="{i18n>netWeight}"/></Column>
+								<Column hAlign="End"><Text text="{i18n>weightInTon}"/></Column>
+								<Column><Text text="{i18n>bulk}"/></Column>
+								<Column hAlign="End" width="6rem"><Text text=""/></Column>
+							</columns>
+
+							<items>
+								<ColumnListItem>
+									<cells>
+										<ObjectIdentifier title="{app>code}"/>
+										<Text text="{app>description}"/>
+										<Text text="{app>netWeight} {app>netWeightUom}"/>
+										<ObjectNumber
+											number="{
+												path: 'app>weightInTon',
+												formatter: '.formatter.tonFactor'
+											}"/>
+										<ObjectStatus
+											text="{= ${app>isBulk} ? ${i18n>yes} : ${i18n>no} }"
+											state="{= ${app>isBulk} ? 'Information' : 'None' }"/>
+										<Button
+											icon="sap-icon://edit"
+											tooltip="{i18n>edit}"
+											press=".onEditPackaging"
+										enabled="{app>/session/permissions/editMasterData}"/>
+									</cells>
+								</ColumnListItem>
+							</items>
+						</Table>
+					</IconTabFilter>
+
+					<!-- ============ Alert thresholds (section 18) ============= -->
+					<IconTabFilter
+						key="thresholds"
+						icon="sap-icon://alert"
+						text="{i18n>tabThresholds}"
+						count="{= ${app>/master/thresholds}.length }">
+
+						<VBox class="sapUiSmallMargin">
+							<MessageStrip
+								text="{i18n>thresholdHint}"
+								type="Information"
+								showIcon="true"
+								class="sapUiTinyMarginBottom"/>
+
+							<Table
+								id="thresholdTable"
+								items="{
+									path: 'app>/master/thresholds',
+									templateShareable: false
+								}"
+								fixedLayout="false">
+
+								<headerToolbar>
+									<Toolbar>
+										<Title text="{i18n>tabThresholds}"/>
+										<ToolbarSpacer/>
+										<Button
+											text="{i18n>addBand}"
+											icon="sap-icon://add"
+											press=".onAddBand"
+										enabled="{app>/session/permissions/editMasterData}"/>
+										<Button
+											text="{i18n>resetBands}"
+											press=".onResetBands"
+										enabled="{app>/session/permissions/editMasterData}"/>
+										<Button
+											text="{i18n>saveBands}"
+											type="Emphasized"
+											press=".onSaveBands"
+										enabled="{app>/session/permissions/editMasterData}"/>
+									</Toolbar>
+								</headerToolbar>
+
+								<columns>
+									<Column><Text text="{i18n>code}"/></Column>
+									<Column><Text text="{i18n>name}"/></Column>
+									<Column hAlign="End" width="8rem"><Text text="{i18n>fromPercent}"/></Column>
+									<Column hAlign="End" width="8rem"><Text text="{i18n>toPercent}"/></Column>
+									<Column><Text text="{i18n>severity}"/></Column>
+									<Column hAlign="End" width="5rem"><Text text=""/></Column>
+								</columns>
+
+								<items>
+									<ColumnListItem>
+										<cells>
+											<Input value="{app>code}" placeholder="HIGH"/>
+											<Input value="{app>name}" placeholder="High"/>
+											<Input
+												value="{app>fromPercentage}"
+												type="Number"
+												textAlign="End"/>
+											<Input
+												value="{app>toPercentage}"
+												type="Number"
+												textAlign="End"
+												placeholder="{i18n>andAbove}"/>
+											<Select selectedKey="{app>severity}">
+												<core:Item key="NORMAL" text="NORMAL"/>
+												<core:Item key="WARNING" text="WARNING"/>
+												<core:Item key="HIGH" text="HIGH"/>
+												<core:Item key="CRITICAL" text="CRITICAL"/>
+												<core:Item key="FULL" text="FULL"/>
+											</Select>
+											<Button
+												icon="sap-icon://delete"
+												tooltip="{i18n>removeBand}"
+												press=".onRemoveBand"
+										enabled="{app>/session/permissions/editMasterData}"/>
+										</cells>
+									</ColumnListItem>
+								</items>
+							</Table>
+						</VBox>
+					</IconTabFilter>
+
+				</items>
+			</IconTabBar>
+		</content>
+	</Page>
+</mvc:View>

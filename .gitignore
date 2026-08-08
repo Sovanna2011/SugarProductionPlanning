@@ -1,0 +1,23 @@
+# Node / UI5 tooling
+node_modules/
+dist/
+.ui5/
+npm-debug.log*
+
+# Go
+*.exe
+/backend/bin/
+/backend/spp-server
+
+# Local environment
+.env
+.env.local
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+/backend/seed-demo
+/backend/spp-seed-users
+/build/

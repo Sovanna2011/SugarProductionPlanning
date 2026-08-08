@@ -1,0 +1,157 @@
+/* Storage Capacity Dashboard styling.
+   Colours are taken from the active SAPUI5 theme rather than hard-coded, so
+   the app follows whichever theme the factory standardises on. */
+
+/* Every element between <body> and the Page must be full height. Without this
+   the Page gives its scrolling section zero height and clips every panel out
+   of view. ComponentSupport inserts its own wrapper div, so the whole chain
+   body > div > ComponentContainer > UIArea > View has to be covered. */
+html,
+body,
+#content > div,
+#content .sapUiComponentContainer,
+#content .sapUiComponentContainer > div,
+#content .sapUiView {
+	height: 100%;
+}
+
+.sppPanel {
+	margin: 0.5rem;
+}
+
+.sppHeaderText {
+	margin-right: 1rem;
+	font-weight: 600;
+}
+
+/* One tank / silo / warehouse tile. */
+.sppCard {
+	background-color: var(--sapTile_Background, #fff);
+	border: 1px solid var(--sapTile_BorderColor, #e5e5e5);
+	border-radius: var(--sapElement_BorderCornerRadius, 0.5rem);
+	padding: 0.75rem 1rem 0.5rem 1rem;
+	height: 100%;
+	box-shadow: var(--sapContent_Shadow0, 0 0 0.125rem rgba(0, 0, 0, 0.1));
+}
+
+.sppBar {
+	margin: 0.75rem 0 0.5rem 0;
+}
+
+/* The current / capacity / safe / available figure row. */
+.sppFigures {
+	margin-top: 0.25rem;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+}
+
+.sppFigures .sapMLabel {
+	font-size: 0.75rem;
+	color: var(--sapContent_LabelColor, #6a6d70);
+}
+
+.sppFigures .sapMText {
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+.sppMuted {
+	color: var(--sapContent_LabelColor, #6a6d70);
+	font-size: 0.8125rem;
+}
+
+.sppRemark {
+	margin-top: 0.5rem;
+	font-style: italic;
+}
+
+.sppProductTable {
+	margin-top: 0.75rem;
+}
+
+/* Keep the numeric columns readable on narrow screens. */
+.sppProductTable .sapMListTblCell {
+	white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+	.sppFigures {
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+}
+
+/* --------------------------------------------------------------------------
+   Signing in
+   --------------------------------------------------------------------------
+   The login screen is the one page somebody sees before they know anything
+   about the system, so it gets room to breathe rather than the dense layout
+   the working screens want.
+   -------------------------------------------------------------------------- */
+
+.sppLoginPage .sapMPageEnableScrolling {
+	background: var(--sapBackgroundColor, #f5f6f7);
+}
+
+.sppLoginShell {
+	min-height: 100%;
+	padding: 2rem 1rem 3rem;
+	gap: 1rem;
+}
+
+.sppLoginCard {
+	width: 100%;
+	max-width: 26rem;
+}
+
+.sppLoginCard .sapMPanelContent {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+}
+
+.sppLoginHeading {
+	gap: 0.25rem;
+	margin-bottom: 0.25rem;
+}
+
+.sppLoginStrip {
+	margin: 0.25rem 0;
+}
+
+.sppLoginButton {
+	margin-top: 0.5rem;
+}
+
+/* The demo panel sits under the form as a secondary offer, not a peer of it. */
+.sppDemoCard {
+	max-width: 32rem;
+}
+
+.sppDemoItem {
+	gap: 0.25rem;
+	padding: 0.75rem 1rem;
+}
+
+.sppDemoItemHead {
+	gap: 0.75rem;
+}
+
+/* The remark is the reason to pick an account, so it wraps rather than clips. */
+.sppDemoItem .sapMText {
+	white-space: normal;
+}
+
+.sppUserMenuBody {
+	gap: 0.25rem;
+	padding: 0.5rem 1rem 0.75rem;
+}
+
+.sppUserMenuRoles {
+	gap: 0.5rem;
+	margin-top: 0.25rem;
+}
+
+.sppPolicyText {
+	margin-top: 0.5rem;
+}

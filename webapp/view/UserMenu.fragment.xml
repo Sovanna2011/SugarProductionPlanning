@@ -1,0 +1,72 @@
+<core:FragmentDefinition
+	xmlns="sap.m"
+	xmlns:core="sap.ui.core">
+
+	<!--
+		The popover behind the user button in every page header. It is defined
+		once and loaded by BaseController, so every screen shows the same thing
+		and there is one place to change it.
+	-->
+	<ResponsivePopover
+		title="{i18n>signedInTitle}"
+		placement="Bottom"
+		contentWidth="20rem"
+		class="sppUserMenu">
+
+		<content>
+			<VBox class="sppUserMenuBody">
+				<Title text="{app>/session/displayName}" level="H3" titleStyle="H5"/>
+				<Text text="{app>/session/username}" class="sppMuted"/>
+
+				<HBox class="sppUserMenuRoles" wrap="Wrap">
+					<ObjectStatus
+						text="{app>/session/rolesText}"
+						state="Information"
+						visible="{= !!${app>/session/rolesText} }"/>
+					<ObjectStatus
+						text="{i18n>noRoles}"
+						state="Warning"
+						visible="{= !${app>/session/rolesText} }"/>
+				</HBox>
+
+				<MessageStrip
+					text="{i18n>mustChangePasswordHint}"
+					type="Warning"
+					showIcon="true"
+					class="sppLoginStrip"
+					visible="{app>/session/mustChangePassword}"/>
+
+				<MessageStrip
+					text="{i18n>viewOnlyHint}"
+					type="Information"
+					showIcon="true"
+					class="sppLoginStrip"
+					visible="{= ${app>/session/permissions/viewOnly} === true }"/>
+			</VBox>
+
+			<List mode="None" showSeparators="Inner">
+				<StandardListItem
+					title="{i18n>manageUsers}"
+					icon="sap-icon://user-settings"
+					type="Active"
+					visible="{app>/session/permissions/manageUsers}"
+					press=".onManageUsers"/>
+				<StandardListItem
+					title="{i18n>changePassword}"
+					icon="sap-icon://key"
+					type="Active"
+					visible="{= ${app>/session/mode} === 'local' }"
+					press=".onChangePassword"/>
+				<StandardListItem
+					title="{i18n>signOut}"
+					icon="sap-icon://log"
+					type="Active"
+					press=".onSignOut"/>
+			</List>
+		</content>
+
+		<endButton>
+			<Button text="{i18n>close}" press=".onCloseUserMenu"/>
+		</endButton>
+	</ResponsivePopover>
+</core:FragmentDefinition>

@@ -1,0 +1,16 @@
+{
+  "name": "kss-sugar-production-planning-webapp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SAP UI5 Storage Capacity Dashboard for sugar production planning",
+  "scripts": {
+    "start": "ui5 serve --port 8080 --open index.html",
+    "//build": "--all bundles the OpenUI5 runtime into dist/resources, which index.html bootstraps from relatively. Without it the built app cannot start.",
+    "build": "ui5 build --all --clean-dest",
+    "//build:app": "App only, for deploying against an existing SAPUI5 runtime served at /resources.",
+    "build:app": "ui5 build --clean-dest"
+  },
+  "devDependencies": {
+    "@ui5/cli": "^4.0.0"
+  }
+}

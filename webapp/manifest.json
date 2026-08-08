@@ -1,0 +1,144 @@
+{
+	"_version": "1.58.0",
+	"sap.app": {
+		"id": "kss.spp",
+		"type": "application",
+		"i18n": "i18n/i18n.properties",
+		"title": "{{appTitle}}",
+		"description": "{{appDescription}}",
+		"applicationVersion": {
+			"version": "1.0.0"
+		},
+		"dataSources": {
+			"sppApi": {
+				"uri": "/api/v1/",
+				"type": "JSON"
+			}
+		}
+	},
+	"sap.ui": {
+		"technology": "UI5",
+		"deviceTypes": {
+			"desktop": true,
+			"tablet": true,
+			"phone": true
+		}
+	},
+	"sap.ui5": {
+		"rootView": {
+			"viewName": "kss.spp.view.App",
+			"type": "XML",
+			"async": true,
+			"id": "app"
+		},
+		"dependencies": {
+			"minUI5Version": "1.120.0",
+			"libs": {
+				"sap.m": {},
+				"sap.ui.core": {},
+				"sap.ui.layout": {},
+				"sap.f": {}
+			}
+		},
+		"contentDensities": {
+			"compact": true,
+			"cozy": true
+		},
+		"models": {
+			"i18n": {
+				"type": "sap.ui.model.resource.ResourceModel",
+				"settings": {
+					"bundleName": "kss.spp.i18n.i18n",
+					"supportedLocales": [
+						"",
+						"en"
+					],
+					"fallbackLocale": "en"
+				}
+			}
+		},
+		"resources": {
+			"css": [
+				{
+					"uri": "css/style.css"
+				}
+			]
+		},
+		"routing": {
+			"config": {
+				"routerClass": "sap.m.routing.Router",
+				"type": "View",
+				"viewType": "XML",
+				"path": "kss.spp.view",
+				"controlId": "app",
+				"controlAggregation": "pages",
+				"async": true,
+				"transition": "slide"
+			},
+			"routes": [
+				{
+					"pattern": "",
+					"name": "dashboard",
+					"target": "dashboard"
+				},
+				{
+					"pattern": "login",
+					"name": "login",
+					"target": "login"
+				},
+				{
+					"pattern": "users",
+					"name": "users",
+					"target": "users"
+				},
+				{
+					"pattern": "master-data",
+					"name": "masterData",
+					"target": "masterData"
+				},
+				{
+					"pattern": "plan-vs-actual",
+					"name": "planVsActual",
+					"target": "planVsActual"
+				},
+				{
+					"pattern": "remelt",
+					"name": "remelt",
+					"target": "remelt"
+				}
+			],
+			"targets": {
+				"dashboard": {
+					"id": "dashboard",
+					"name": "Dashboard",
+					"level": 1
+				},
+				"login": {
+					"id": "login",
+					"name": "Login",
+					"level": 0
+				},
+				"users": {
+					"id": "users",
+					"name": "Users",
+					"level": 2
+				},
+				"masterData": {
+					"id": "masterData",
+					"name": "MasterData",
+					"level": 2
+				},
+				"planVsActual": {
+					"id": "planVsActual",
+					"name": "PlanVsActual",
+					"level": 2
+				},
+				"remelt": {
+					"id": "remelt",
+					"name": "Remelt",
+					"level": 2
+				}
+			}
+		}
+	}
+}

@@ -1,0 +1,116 @@
+<core:FragmentDefinition
+	xmlns="sap.m"
+	xmlns:core="sap.ui.core"
+	xmlns:l="sap.ui.layout">
+
+	<Dialog
+		id="projectionDialog"
+		contentWidth="52rem"
+		contentHeight="34rem"
+		resizable="true"
+		draggable="true"
+		verticalScrolling="true">
+
+		<content>
+			<VBox class="sapUiSmallMargin">
+
+				<!-- The headline the requirement asks to be highlighted:
+				     the first date the scope exceeds safe capacity. -->
+				<MessageStrip
+					class="sapUiTinyMarginBottom"
+					showIcon="true"
+					type="Error"
+					visible="{= !!${proj>/firstPhysicalBreachDate} }"
+					text="{
+						parts: ['proj>/firstPhysicalBreachDate', 'proj>/capacity', 'proj>/uom'],
+						formatter: '.formatter.breachText'
+					}"/>
+
+				<MessageStrip
+					class="sapUiTinyMarginBottom"
+					showIcon="true"
+					type="Warning"
+					visible="{= !!${proj>/firstSafeBreachDate} }"
+					text="{
+						parts: ['proj>/firstSafeBreachDate', 'proj>/safeCapacity', 'proj>/uom'],
+						formatter: '.formatter.safeBreachText'
+					}"/>
+
+				<MessageStrip
+					class="sapUiTinyMarginBottom"
+					showIcon="true"
+					type="Success"
+					visible="{= !${proj>/firstSafeBreachDate} &amp;&amp; !${proj>/firstPhysicalBreachDate} }"
+					text="{i18n>noBreachExpected}"/>
+
+				<!-- Horizons: today, +1, +3, +7, end of month, end of season -->
+				<Title level="H5" text="{i18n>horizons}" class="sapUiSmallMarginTop"/>
+				<Table items="{proj>/horizons}" fixedLayout="false">
+					<columns>
+						<Column><Text text="{i18n>horizon}"/></Column>
+						<Column><Text text="{i18n>date}"/></Column>
+						<Column hAlign="End"><Text text="{i18n>projectedClosing}"/></Column>
+						<Column hAlign="End"><Text text="{i18n>available}"/></Column>
+						<Column hAlign="End"><Text text="{i18n>utilization}"/></Column>
+					</columns>
+					<items>
+						<ColumnListItem>
+							<cells>
+								<Text text="{proj>label}"/>
+								<Text text="{path: 'proj>date', formatter: '.formatter.shortDate'}"/>
+								<Text text="{
+									parts: ['proj>closing', 'proj>/uom'],
+									formatter: '.formatter.qty'
+								}"/>
+								<Text text="{
+									parts: ['proj>availableCapacity', 'proj>/uom'],
+									formatter: '.formatter.qty'
+								}"/>
+								<ObjectStatus
+									text="{path: 'proj>utilizationPercentage', formatter: '.formatter.percent'}"
+									state="{proj>band/uiState}"/>
+							</cells>
+						</ColumnListItem>
+					</items>
+				</Table>
+
+				<!-- Day by day -->
+				<Title level="H5" text="{i18n>dailyCurve}" class="sapUiSmallMarginTop"/>
+				<Table items="{proj>/previewDays}" fixedLayout="false" growing="true" growingThreshold="20">
+					<columns>
+						<Column><Text text="{i18n>date}"/></Column>
+						<Column hAlign="End"><Text text="{i18n>opening}"/></Column>
+						<Column hAlign="End"><Text text="{i18n>plannedIn}"/></Column>
+						<Column hAlign="End"><Text text="{i18n>plannedOut}"/></Column>
+						<Column hAlign="End"><Text text="{i18n>closing}"/></Column>
+						<Column hAlign="End"><Text text="{i18n>utilization}"/></Column>
+					</columns>
+					<items>
+						<ColumnListItem>
+							<cells>
+								<Text text="{path: 'proj>date', formatter: '.formatter.shortDate'}"/>
+								<Text text="{path: 'proj>opening', formatter: '.formatter.tons'}"/>
+								<Text text="{path: 'proj>plannedIn', formatter: '.formatter.tons'}"/>
+								<Text text="{path: 'proj>plannedOut', formatter: '.formatter.tons'}"/>
+								<Text text="{path: 'proj>closing', formatter: '.formatter.tons'}"/>
+								<ObjectStatus
+									text="{path: 'proj>utilizationPercentage', formatter: '.formatter.percent'}"
+									state="{proj>band/uiState}"/>
+							</cells>
+						</ColumnListItem>
+					</items>
+				</Table>
+
+				<Text
+					class="sppMuted sapUiTinyMarginTop"
+					visible="{proj>/truncated}"
+					text="{i18n>truncatedCurve}"/>
+
+			</VBox>
+		</content>
+
+		<beginButton>
+			<Button text="{i18n>close}" press=".onCloseProjection"/>
+		</beginButton>
+	</Dialog>
+</core:FragmentDefinition>

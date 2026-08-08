@@ -1,0 +1,71 @@
+# The whole system: PostgreSQL plus the API server serving the UI5 dashboard.
+#
+#   docker compose up --build
+#   open http://localhost:8080
+#
+# The database is seeded on first start: master data, and the 2026/27 season
+# plan extracted from the planning workbook.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: spp
+      POSTGRES_PASSWORD: ${SPP_DB_PASSWORD:-spp}
+      POSTGRES_DB: spp
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      # Exposed for psql and for pointing a local backend at it. Drop this
+      # line in production so the database is only reachable on the network.
+      - "${SPP_DB_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U spp -d spp"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+    environment:
+      SPP_DATABASE_URL: postgres://spp:${SPP_DB_PASSWORD:-spp}@db:5432/spp?sslmode=disable
+      SPP_ADDR: ":8080"
+      SPP_WEB_DIR: /app/web
+      SPP_AUTO_MIGRATE: "true"
+      SPP_LOG_LEVEL: ${SPP_LOG_LEVEL:-info}
+
+      # Authentication is off by default, which is only safe on a trusted
+      # network — the server says so on every start.
+      #
+      # To require a sign-in, set SPP_AUTH_MODE=local and create accounts:
+      #
+      #   SPP_AUTH_MODE=local docker compose up -d app
+      #   docker compose exec app spp-seed-users -demo          # one per role, to try it out
+      #   docker compose exec app spp-seed-users -admin <name>  # a real administrator
+      #
+      # Set SPP_SESSION_COOKIE_SECURE=true wherever this is served over HTTPS,
+      # and see docs/security.md.
+      SPP_AUTH_MODE: ${SPP_AUTH_MODE:-none}
+      SPP_OVERRIDE_ROLE: ${SPP_OVERRIDE_ROLE:-}
+      SPP_SESSION_TTL: ${SPP_SESSION_TTL:-12h}
+      SPP_SESSION_MAX_LIFETIME: ${SPP_SESSION_MAX_LIFETIME:-168h}
+      SPP_SESSION_COOKIE_SECURE: ${SPP_SESSION_COOKIE_SECURE:-false}
+
+      # Behind a reverse proxy, name it here or every client looks like the
+      # proxy and the sign-in limit below becomes one global limit.
+      SPP_TRUSTED_PROXIES: ${SPP_TRUSTED_PROXIES:-}
+      SPP_LOGIN_MAX_FAILURES: ${SPP_LOGIN_MAX_FAILURES:-15}
+      SPP_LOGIN_FAILURE_WINDOW: ${SPP_LOGIN_FAILURE_WINDOW:-15m}
+    ports:
+      - "${SPP_PORT:-8080}:8080"
+    depends_on:
+      db:
+        # Migrations run on start, so the database has to be accepting
+        # connections first rather than merely created.
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  db-data:
