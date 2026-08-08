@@ -39,8 +39,10 @@ func scanUser(r pgx.Rows) (domain.User, error) {
 
 // UserFilter narrows a user query.
 type UserFilter struct {
-	Username        string
-	Role            string
+	Username string
+	Role     string
+	// DemoOnly narrows to the fixture accounts created by seed-users -demo.
+	DemoOnly        bool
 	IncludeInactive bool
 }
 
@@ -52,6 +54,9 @@ func (s *Store) ListUsers(ctx context.Context, f UserFilter) ([]domain.User, err
 	}
 	if f.Role != "" {
 		w.add("? = ANY (u.roles)", strings.ToUpper(strings.TrimSpace(f.Role)))
+	}
+	if f.DemoOnly {
+		w.add("u.is_demo")
 	}
 	if !f.IncludeInactive {
 		w.add("u.status = 'ACTIVE'")

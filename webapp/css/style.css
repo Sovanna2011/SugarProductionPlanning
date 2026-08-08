@@ -80,3 +80,78 @@ body,
 		gap: 0.25rem;
 	}
 }
+
+/* --------------------------------------------------------------------------
+   Signing in
+   --------------------------------------------------------------------------
+   The login screen is the one page somebody sees before they know anything
+   about the system, so it gets room to breathe rather than the dense layout
+   the working screens want.
+   -------------------------------------------------------------------------- */
+
+.sppLoginPage .sapMPageEnableScrolling {
+	background: var(--sapBackgroundColor, #f5f6f7);
+}
+
+.sppLoginShell {
+	min-height: 100%;
+	padding: 2rem 1rem 3rem;
+	gap: 1rem;
+}
+
+.sppLoginCard {
+	width: 100%;
+	max-width: 26rem;
+}
+
+.sppLoginCard .sapMPanelContent {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+}
+
+.sppLoginHeading {
+	gap: 0.25rem;
+	margin-bottom: 0.25rem;
+}
+
+.sppLoginStrip {
+	margin: 0.25rem 0;
+}
+
+.sppLoginButton {
+	margin-top: 0.5rem;
+}
+
+/* The demo panel sits under the form as a secondary offer, not a peer of it. */
+.sppDemoCard {
+	max-width: 32rem;
+}
+
+.sppDemoItem {
+	gap: 0.25rem;
+	padding: 0.75rem 1rem;
+}
+
+.sppDemoItemHead {
+	gap: 0.75rem;
+}
+
+/* The remark is the reason to pick an account, so it wraps rather than clips. */
+.sppDemoItem .sapMText {
+	white-space: normal;
+}
+
+.sppUserMenuBody {
+	gap: 0.25rem;
+	padding: 0.5rem 1rem 0.75rem;
+}
+
+.sppUserMenuRoles {
+	gap: 0.5rem;
+	margin-top: 0.25rem;
+}
+
+.sppPolicyText {
+	margin-top: 0.5rem;
+}

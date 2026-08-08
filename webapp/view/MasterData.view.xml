@@ -19,6 +19,13 @@
 				icon="sap-icon://refresh"
 				tooltip="{i18n>refresh}"
 				press=".onRefresh"/>
+			<Button
+				id="userButton"
+				icon="sap-icon://person-placeholder"
+				text="{app>/session/displayName}"
+				tooltip="{i18n>signedInTitle}"
+				visible="{app>/session/loginRequired}"
+				press=".onOpenUserMenu"/>
 		</headerContent>
 
 		<content>
@@ -57,7 +64,8 @@
 										text="{i18n>newLocation}"
 										icon="sap-icon://add"
 										type="Emphasized"
-										press=".onNewLocation"/>
+										press=".onNewLocation"
+										enabled="{app>/session/permissions/editMasterData}"/>
 								</Toolbar>
 							</headerToolbar>
 
@@ -91,7 +99,8 @@
 										<Button
 											icon="sap-icon://edit"
 											tooltip="{i18n>edit}"
-											press=".onEditLocation"/>
+											press=".onEditLocation"
+										enabled="{app>/session/permissions/editMasterData}"/>
 									</cells>
 								</ColumnListItem>
 							</items>
@@ -123,7 +132,8 @@
 										text="{i18n>newCapacity}"
 										icon="sap-icon://add"
 										type="Emphasized"
-										press=".onNewCapacity"/>
+										press=".onNewCapacity"
+										enabled="{app>/session/permissions/editMasterData}"/>
 								</Toolbar>
 							</headerToolbar>
 
@@ -155,7 +165,8 @@
 										<Button
 											icon="sap-icon://edit"
 											tooltip="{i18n>edit}"
-											press=".onEditCapacity"/>
+											press=".onEditCapacity"
+										enabled="{app>/session/permissions/editMasterData}"/>
 									</cells>
 								</ColumnListItem>
 							</items>
@@ -185,7 +196,8 @@
 										text="{i18n>newPackaging}"
 										icon="sap-icon://add"
 										type="Emphasized"
-										press=".onNewPackaging"/>
+										press=".onNewPackaging"
+										enabled="{app>/session/permissions/editMasterData}"/>
 								</Toolbar>
 							</headerToolbar>
 
@@ -215,7 +227,8 @@
 										<Button
 											icon="sap-icon://edit"
 											tooltip="{i18n>edit}"
-											press=".onEditPackaging"/>
+											press=".onEditPackaging"
+										enabled="{app>/session/permissions/editMasterData}"/>
 									</cells>
 								</ColumnListItem>
 							</items>
@@ -251,14 +264,17 @@
 										<Button
 											text="{i18n>addBand}"
 											icon="sap-icon://add"
-											press=".onAddBand"/>
+											press=".onAddBand"
+										enabled="{app>/session/permissions/editMasterData}"/>
 										<Button
 											text="{i18n>resetBands}"
-											press=".onResetBands"/>
+											press=".onResetBands"
+										enabled="{app>/session/permissions/editMasterData}"/>
 										<Button
 											text="{i18n>saveBands}"
 											type="Emphasized"
-											press=".onSaveBands"/>
+											press=".onSaveBands"
+										enabled="{app>/session/permissions/editMasterData}"/>
 									</Toolbar>
 								</headerToolbar>
 
@@ -295,7 +311,8 @@
 											<Button
 												icon="sap-icon://delete"
 												tooltip="{i18n>removeBand}"
-												press=".onRemoveBand"/>
+												press=".onRemoveBand"
+										enabled="{app>/session/permissions/editMasterData}"/>
 										</cells>
 									</ColumnListItem>
 								</items>

@@ -184,6 +184,23 @@ sap.ui.define([], function () {
 			return d.toLocaleDateString("en-GB", {
 				day: "2-digit", month: "short", year: "numeric"
 			});
+		},
+
+		/**
+		 * A timestamp from the API, shown as "28 May 2027, 14:05". Used for
+		 * the last sign-in, where the time of day is the point.
+		 */
+		dateTime: function (value) {
+			if (!value) {
+				return "—";
+			}
+			var d = new Date(value);
+			if (isNaN(d.getTime())) {
+				return value;
+			}
+			return d.toLocaleDateString("en-GB", {
+				day: "2-digit", month: "short", year: "numeric"
+			}) + ", " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 		}
 	};
 

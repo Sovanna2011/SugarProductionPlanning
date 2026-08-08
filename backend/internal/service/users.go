@@ -339,6 +339,43 @@ func (s *Service) ListUsers(ctx context.Context, includeInactive bool) ([]domain
 	return s.store.ListUsers(ctx, postgres.UserFilter{IncludeInactive: includeInactive})
 }
 
+// DemoAccounts returns the fixture accounts this database actually holds, in
+// the order the login screen should offer them.
+//
+// It returns the ones that exist rather than the ones that could exist, so a
+// login screen never offers an account that would then refuse the password.
+func (s *Service) DemoAccounts(ctx context.Context) ([]auth.DemoAccount, error) {
+	present, err := s.store.ListUsers(ctx, postgres.UserFilter{DemoOnly: true})
+	if err != nil {
+		return nil, err
+	}
+	if len(present) == 0 {
+		return nil, nil
+	}
+
+	byName := make(map[string]domain.User, len(present))
+	for _, u := range present {
+		byName[u.Username] = u
+	}
+
+	out := make([]auth.DemoAccount, 0, len(present))
+	for _, fixture := range auth.DemoAccounts {
+		u, ok := byName[fixture.Username]
+		if !ok {
+			continue
+		}
+		// The roles come from the database, not the fixture: an administrator
+		// may have changed them, and the screen should say what is true.
+		out = append(out, auth.DemoAccount{
+			Username: u.Username,
+			Name:     u.DisplayName,
+			Roles:    u.Roles,
+			Remark:   fixture.Remark,
+		})
+	}
+	return out, nil
+}
+
 // SaveUser creates or updates an account.
 func (s *Service) SaveUser(ctx context.Context, in UserInput) (UserSaveResult, error) {
 	if err := in.Validate(); err != nil {

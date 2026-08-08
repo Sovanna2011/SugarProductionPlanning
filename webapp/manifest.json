@@ -82,6 +82,16 @@
 					"target": "dashboard"
 				},
 				{
+					"pattern": "login",
+					"name": "login",
+					"target": "login"
+				},
+				{
+					"pattern": "users",
+					"name": "users",
+					"target": "users"
+				},
+				{
 					"pattern": "master-data",
 					"name": "masterData",
 					"target": "masterData"
@@ -102,6 +112,16 @@
 					"id": "dashboard",
 					"name": "Dashboard",
 					"level": 1
+				},
+				"login": {
+					"id": "login",
+					"name": "Login",
+					"level": 0
+				},
+				"users": {
+					"id": "users",
+					"name": "Users",
+					"level": 2
 				},
 				"masterData": {
 					"id": "masterData",

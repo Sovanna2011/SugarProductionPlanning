@@ -1,0 +1,80 @@
+<core:FragmentDefinition
+	xmlns="sap.m"
+	xmlns:core="sap.ui.core"
+	xmlns:f="sap.ui.layout.form">
+
+	<Dialog
+		title="{= ${edit>/isNew} ? ${i18n>newUser} : ${i18n>editUser} }"
+		contentWidth="34rem"
+		class="sppDialog">
+
+		<content>
+			<f:SimpleForm
+				editable="true"
+				layout="ResponsiveGridLayout"
+				labelSpanXL="4" labelSpanL="4" labelSpanM="4" labelSpanS="12"
+				adjustLabelSpan="false"
+				columnsXL="1" columnsL="1">
+				<f:content>
+
+					<Label text="{i18n>username}" labelFor="usernameField"/>
+					<Input
+						id="usernameField"
+						value="{edit>/username}"
+						editable="{edit>/isNew}"
+						placeholder="{i18n>usernamePlaceholder}"/>
+					<Text
+						text="{i18n>usernameFixedHint}"
+						class="sppMuted"
+						visible="{= !${edit>/isNew} }"/>
+
+					<Label text="{i18n>displayName}" labelFor="displayNameField"/>
+					<Input id="displayNameField" value="{edit>/displayName}"/>
+
+					<Label text="{i18n>email}" labelFor="emailField"/>
+					<Input id="emailField" value="{edit>/email}" type="Email"/>
+
+					<Label text="{i18n>rolesLabel}"/>
+					<VBox>
+						<CheckBox text="{i18n>roleAdmin}" selected="{edit>/roleAdmin}"/>
+						<CheckBox text="{i18n>rolePlanner}" selected="{edit>/rolePlanner}"/>
+						<CheckBox text="{i18n>roleWarehouse}" selected="{edit>/roleWarehouse}"/>
+						<CheckBox text="{i18n>roleViewer}" selected="{edit>/roleViewer}"/>
+					</VBox>
+
+					<Label text="{i18n>statusLabel}" labelFor="statusSelect"/>
+					<Select id="statusSelect" selectedKey="{edit>/status}" width="100%">
+						<core:Item key="ACTIVE" text="{i18n>statusActive}"/>
+						<core:Item key="INACTIVE" text="{i18n>statusInactive}"/>
+					</Select>
+
+					<Label text="{i18n>initialPassword}" labelFor="passwordField" visible="{edit>/isNew}"/>
+					<Input
+						id="passwordField"
+						type="Password"
+						value="{edit>/password}"
+						visible="{edit>/isNew}"
+						placeholder="{i18n>leaveBlankToGenerate}"/>
+
+					<Label text="{i18n>remark}" labelFor="remarkField"/>
+					<TextArea id="remarkField" value="{edit>/remark}" rows="2" width="100%"/>
+
+				</f:content>
+			</f:SimpleForm>
+
+			<MessageStrip
+				text="{i18n>newUserPasswordHint}"
+				type="Information"
+				showIcon="true"
+				class="sppLoginStrip"
+				visible="{edit>/isNew}"/>
+		</content>
+
+		<beginButton>
+			<Button text="{i18n>save}" type="Emphasized" press=".onSaveUser"/>
+		</beginButton>
+		<endButton>
+			<Button text="{i18n>cancel}" press=".onCancelUser"/>
+		</endButton>
+	</Dialog>
+</core:FragmentDefinition>

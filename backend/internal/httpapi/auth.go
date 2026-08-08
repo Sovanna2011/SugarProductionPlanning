@@ -123,15 +123,40 @@ type authConfig struct {
 	LoginRequired bool     `json:"loginRequired"`
 	CanChangeOwn  bool     `json:"canChangePassword"`
 	Roles         []string `json:"roles"`
+
+	// DemoAccounts is filled in only when this database actually holds the
+	// fixture accounts, and then it carries their shared password too.
+	//
+	// Publishing a password from an endpoint that needs no authentication is
+	// indefensible for a real account and unavoidable for a fixture: these
+	// accounts exist to be signed in as, by whoever has the page open. The
+	// list empties itself the moment `spp-seed-users -remove-demo` runs, and
+	// the server warns on every start until it does.
+	DemoAccounts []auth.DemoAccount `json:"demoAccounts,omitempty"`
+	DemoPassword string             `json:"demoPassword,omitempty"`
 }
 
 func (a *API) authConfigHandler(w http.ResponseWriter, r *http.Request) {
-	a.writeJSON(w, http.StatusOK, authConfig{
+	cfg := authConfig{
 		Mode:          string(a.auth.Mode),
 		LoginRequired: a.auth.LoginRequired(),
 		CanChangeOwn:  a.auth.Mode == auth.ModeLocal,
 		Roles:         auth.KnownRoles,
-	})
+	}
+
+	if a.auth.Mode == auth.ModeLocal {
+		present, err := a.svc.DemoAccounts(r.Context())
+		if err != nil {
+			// The login screen still works without the shortcut, so a failure
+			// here is logged rather than served as an error.
+			a.log.Error("read demo accounts", "error", err)
+		} else if len(present) > 0 {
+			cfg.DemoAccounts = present
+			cfg.DemoPassword = auth.DemoPassword
+		}
+	}
+
+	a.writeJSON(w, http.StatusOK, cfg)
 }
 
 // login verifies the credentials and, on success, sets the session cookie.
@@ -192,6 +217,9 @@ type meResponse struct {
 	Permissions        permissions `json:"permissions"`
 	MustChangePassword bool        `json:"mustChangePassword"`
 	Mode               string      `json:"mode"`
+	// LoginRequired lets the browser decide whether to show a login screen
+	// from this one answer, rather than combining two.
+	LoginRequired bool `json:"loginRequired"`
 }
 
 // permissions is what this caller may do, in the terms the screens use.
@@ -209,9 +237,10 @@ func (a *API) me(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		// Not an error: the browser asks this on start precisely to find out.
 		a.writeJSON(w, http.StatusOK, meResponse{
-			Roles:       []string{},
-			Mode:        string(a.auth.Mode),
-			Permissions: a.permissionsFor(auth.Identity{}, false),
+			Roles:         []string{},
+			Mode:          string(a.auth.Mode),
+			LoginRequired: a.auth.LoginRequired(),
+			Permissions:   a.permissionsFor(auth.Identity{}, false),
 		})
 		return
 	}
@@ -228,6 +257,7 @@ func (a *API) me(w http.ResponseWriter, r *http.Request) {
 		Permissions:        a.permissionsFor(id, true),
 		MustChangePassword: id.MustChangePassword,
 		Mode:               string(a.auth.Mode),
+		LoginRequired:      a.auth.LoginRequired(),
 	})
 }
 

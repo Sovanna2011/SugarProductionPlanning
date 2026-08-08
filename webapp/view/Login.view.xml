@@ -1,0 +1,131 @@
+<mvc:View
+	controllerName="kss.spp.controller.Login"
+	xmlns="sap.m"
+	xmlns:mvc="sap.ui.core.mvc"
+	xmlns:f="sap.ui.layout.form"
+	displayBlock="true"
+	height="100%">
+
+	<Page id="loginPage" showHeader="false" class="sppLoginPage" busy="{login>/busy}" busyIndicatorDelay="0">
+		<content>
+
+			<VBox class="sppLoginShell" alignItems="Center" justifyContent="Center">
+
+				<Panel class="sppLoginCard" backgroundDesign="Solid">
+					<content>
+
+						<VBox class="sppLoginHeading">
+							<Title text="{i18n>appTitle}" level="H1" titleStyle="H3"/>
+							<Text text="{i18n>loginSubtitle}" class="sppMuted"/>
+						</VBox>
+
+						<MessageStrip
+							text="{login>/error}"
+							type="Error"
+							showIcon="true"
+							class="sppLoginStrip"
+							visible="{= !!${login>/error} }"/>
+
+						<MessageStrip
+							text="{i18n>loginNotRequired}"
+							type="Information"
+							showIcon="true"
+							class="sppLoginStrip"
+							visible="{= !${app>/session/loginRequired} }"/>
+
+						<f:SimpleForm
+							editable="true"
+							layout="ResponsiveGridLayout"
+							labelSpanXL="12" labelSpanL="12" labelSpanM="12" labelSpanS="12"
+							adjustLabelSpan="false"
+							columnsXL="1" columnsL="1"
+							class="sppLoginForm">
+							<f:content>
+								<Label text="{i18n>username}" labelFor="username"/>
+								<Input
+									id="username"
+									value="{login>/username}"
+									placeholder="{i18n>usernamePlaceholder}"
+									enabled="{app>/session/loginRequired}"
+									submit=".onSignIn"/>
+
+								<Label text="{i18n>password}" labelFor="password"/>
+								<Input
+									id="password"
+									type="Password"
+									value="{login>/password}"
+									enabled="{app>/session/loginRequired}"
+									submit=".onSignIn"/>
+							</f:content>
+						</f:SimpleForm>
+
+						<Button
+							text="{i18n>signIn}"
+							type="Emphasized"
+							width="100%"
+							class="sppLoginButton"
+							enabled="{app>/session/loginRequired}"
+							press=".onSignIn"/>
+
+						<Button
+							text="{i18n>continueWithoutSigningIn}"
+							type="Transparent"
+							width="100%"
+							visible="{= !${app>/session/loginRequired} }"
+							press=".onContinue"/>
+
+					</content>
+				</Panel>
+
+				<!--
+					Only rendered when this database actually holds the fixture
+					accounts. The server sends them, and the password with
+					them, because they are published in the documentation; a
+					deployment that has run `spp-seed-users -remove-demo` sends
+					nothing and this whole panel disappears.
+				-->
+				<Panel
+					class="sppLoginCard sppDemoCard"
+					backgroundDesign="Transparent"
+					visible="{= (${login>/demoAccounts} || []).length > 0 }">
+					<content>
+						<VBox class="sppLoginHeading">
+							<Title text="{i18n>demoAccountsTitle}" level="H2" titleStyle="H5"/>
+							<Text text="{i18n>demoAccountsHint}" class="sppMuted"/>
+						</VBox>
+
+						<!--
+							A custom item rather than a standard one: the
+							remark is the reason to pick this account, so it
+							has to be readable in full rather than clipped to
+							one line.
+						-->
+						<List
+							items="{login>/demoAccounts}"
+							mode="None"
+							class="sppDemoList"
+							showSeparators="Inner">
+							<CustomListItem type="Active" press=".onUseDemoAccount">
+								<VBox class="sppDemoItem">
+									<HBox alignItems="Center" wrap="Wrap" class="sppDemoItemHead">
+										<Title text="{login>displayName}" level="H3" titleStyle="H6"/>
+										<ObjectStatus text="{login>rolesText}" state="Information"/>
+									</HBox>
+									<Text text="{login>remark}" class="sppMuted"/>
+								</VBox>
+							</CustomListItem>
+						</List>
+
+						<MessageStrip
+							text="{i18n>demoPasswordWarning}"
+							type="Warning"
+							showIcon="true"
+							class="sppLoginStrip"/>
+					</content>
+				</Panel>
+
+			</VBox>
+
+		</content>
+	</Page>
+</mvc:View>

@@ -1,0 +1,129 @@
+<mvc:View
+	controllerName="kss.spp.controller.Users"
+	xmlns="sap.m"
+	xmlns:mvc="sap.ui.core.mvc"
+	displayBlock="true"
+	height="100%">
+
+	<Page
+		id="page"
+		title="{i18n>usersTitle}"
+		showNavButton="true"
+		navButtonPress=".onNavBack"
+		busy="{app>/users/busy}"
+		busyIndicatorDelay="0"
+		class="sppPage">
+
+		<headerContent>
+			<Button
+				icon="sap-icon://add"
+				text="{i18n>newUser}"
+				type="Emphasized"
+				press=".onNewUser"/>
+			<Button
+				icon="sap-icon://refresh"
+				tooltip="{i18n>refresh}"
+				press=".onRefresh"/>
+			<Button
+				id="userButton"
+				icon="sap-icon://person-placeholder"
+				text="{app>/session/displayName}"
+				tooltip="{i18n>signedInTitle}"
+				visible="{app>/session/loginRequired}"
+				press=".onOpenUserMenu"/>
+		</headerContent>
+
+		<content>
+			<MessageStrip
+				text="{i18n>usersHint}"
+				type="Information"
+				showIcon="true"
+				class="sppHint"/>
+
+			<Panel headerText="{i18n>accounts}" class="sppPanel">
+				<headerToolbar>
+					<OverflowToolbar>
+						<Title text="{i18n>accounts}"/>
+						<ToolbarSpacer/>
+						<CheckBox
+							text="{i18n>showInactive}"
+							selected="{app>/users/includeInactive}"
+							select=".onRefresh"/>
+					</OverflowToolbar>
+				</headerToolbar>
+
+				<Table
+					id="userTable"
+					items="{app>/users/list}"
+					mode="None"
+					class="sppProductTable"
+					noDataText="{i18n>noUsers}">
+
+					<columns>
+						<Column><Text text="{i18n>username}"/></Column>
+						<Column><Text text="{i18n>displayName}"/></Column>
+						<Column minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>rolesLabel}"/></Column>
+						<Column minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>statusLabel}"/></Column>
+						<Column minScreenWidth="Desktop" demandPopin="true"><Text text="{i18n>lastLogin}"/></Column>
+						<Column hAlign="End"><Text text="{i18n>actions}"/></Column>
+					</columns>
+
+					<items>
+						<ColumnListItem>
+							<cells>
+								<VBox>
+									<Text text="{app>username}"/>
+									<ObjectStatus
+										text="{i18n>demoAccountTag}"
+										state="Warning"
+										visible="{app>isDemo}"/>
+								</VBox>
+
+								<VBox>
+									<Text text="{app>displayName}"/>
+									<Text text="{app>email}" class="sppMuted" visible="{= !!${app>email} }"/>
+								</VBox>
+
+								<Text text="{= (${app>roles} || []).join(', ') }"/>
+
+								<VBox>
+									<ObjectStatus
+										text="{app>status}"
+										state="{= ${app>status} === 'ACTIVE' ? 'Success' : 'Error' }"/>
+									<ObjectStatus
+										text="{i18n>mustChangeTag}"
+										state="Warning"
+										visible="{app>mustChangePassword}"/>
+									<ObjectStatus
+										text="{i18n>lockedTag}"
+										state="Error"
+										visible="{= !!${app>lockedUntil} }"/>
+								</VBox>
+
+								<Text text="{path: 'app>lastLoginAt', formatter: '.formatter.dateTime'}"/>
+
+								<HBox justifyContent="End">
+									<Button
+										icon="sap-icon://edit"
+										tooltip="{i18n>edit}"
+										type="Transparent"
+										press=".onEditUser"/>
+									<Button
+										icon="sap-icon://key"
+										tooltip="{i18n>resetPassword}"
+										type="Transparent"
+										press=".onResetPassword"/>
+									<Button
+										icon="sap-icon://log"
+										tooltip="{i18n>signOutEverywhere}"
+										type="Transparent"
+										press=".onSignOutUser"/>
+								</HBox>
+							</cells>
+						</ColumnListItem>
+					</items>
+				</Table>
+			</Panel>
+		</content>
+	</Page>
+</mvc:View>

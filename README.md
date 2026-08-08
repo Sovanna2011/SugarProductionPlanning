@@ -88,6 +88,35 @@ normal service so they pass the same capacity validation as any other receipt.
 Pass `-date 2027-04-10` for the raw sugar peak. It refuses to run against a
 database that already holds stock unless given `-force`.
 
+#### Trying it with logins
+
+By default there is no sign-in: every screen is open and every button works.
+To see the role separation instead, turn on the application's own login and
+create one account per role:
+
+```bash
+docker compose exec app spp-seed-users -demo     # or: cd backend && go run ./cmd/seed-users -demo
+SPP_AUTH_MODE=local SPP_OVERRIDE_ROLE=ADMIN docker compose up -d app
+```
+
+The login screen then offers the five accounts; pick one and the screens
+change with it.
+
+| User | Roles | What changes |
+|---|---|---|
+| `admin` | `ADMIN` | Everything, plus the Users screen and the capacity override |
+| `planner` | `PLANNER` | Master data and the plan; the remelt issue button is off |
+| `warehouse` | `WAREHOUSE` | Stock movements; the master data buttons are off |
+| `refinery` | `WAREHOUSE`, `PLANNER` | Both of the above |
+| `viewer` | `VIEWER` | Every screen readable, every write refused |
+
+They share the password `Demo-Sugar-2027`, which is on the login screen. That
+is safe only because it is a fixture: the accounts are flagged in the database,
+the server warns about them on every start, and `spp-seed-users -remove-demo`
+takes them away. For a real deployment use `spp-seed-users -admin <name>`,
+which generates a password, prints it once, and requires it to be changed at
+first sign-in. See [docs/security.md](docs/security.md).
+
 ### Running from source
 
 ### 1. Database
@@ -139,8 +168,11 @@ or change the bootstrap `src` in `webapp/index.html` to use the SAP CDN.
 | `SPP_WEB_DIR` | *(none)* | Directory to serve the dashboard from |
 | `SPP_AUTO_MIGRATE` | `true` | Apply pending migrations on start |
 | `SPP_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
-| `SPP_AUTH_MODE` | `none` | `none` or `proxy`. See [docs/security.md](docs/security.md) |
+| `SPP_AUTH_MODE` | `none` | `none`, `local` or `proxy`. See [docs/security.md](docs/security.md) |
 | `SPP_AUTH_USER_HEADER` | `X-Forwarded-User` | Identity header under `proxy` mode |
+| `SPP_SESSION_TTL` | `12h` | How long a session lasts under `local` mode |
+| `SPP_SESSION_COOKIE` | `spp_session` | Session cookie name under `local` mode |
+| `SPP_SESSION_COOKIE_SECURE` | `false` | Mark the session cookie `Secure`. **Set this wherever the site is served over HTTPS** |
 | `SPP_OVERRIDE_ROLE` | *(none)* | Role required to force a blocked posting. Unset leaves overrides open |
 
 ## The capacity rules
@@ -218,6 +250,21 @@ plan's own opening figure.
 ## API
 
 All endpoints are under `/api/v1`.
+
+**Signing in** (`local` mode; the first four need no session)
+
+```
+GET  /auth/config                             what this deployment does about sign-in
+POST /auth/login                              {username, password} -> session cookie + token
+GET  /auth/me                                 who the caller is, and what they may do
+POST /auth/logout                             ends the session
+POST /auth/change-password                    {currentPassword, newPassword}
+
+GET  /admin/users                   ?includeInactive       ADMIN only
+POST /admin/users                             create or update an account
+POST /admin/users/reset-password              issue a new password, shown once
+POST /admin/users/sign-out                    end every session of an account
+```
 
 **Master data**
 
@@ -373,8 +420,10 @@ Capacity figures are marked in each row's `remark`:
 
 > **Before deploying this outside a trusted network, read
 > [docs/security.md](docs/security.md).** Authentication defaults to `none`, so
-> an unconfigured deployment is open. Set `SPP_AUTH_MODE=proxy` behind an
-> authenticating reverse proxy, and note that no endpoint checks roles yet.
+> an unconfigured deployment is open. Set `SPP_AUTH_MODE=local` and create an
+> administrator with `spp-seed-users`, or `SPP_AUTH_MODE=proxy` behind an
+> authenticating reverse proxy — and in that case pass the roles header, or
+> everyone will be able to read everything and change nothing.
 
 See [docs/production-plan-2026-2027.md](docs/production-plan-2026-2027.md) for
 what the plan says and what the system independently reproduces from it, and
@@ -396,6 +445,12 @@ A further 30 unit tests cover the master data validation rules — package weigh
 derivation, the alert band cover, and every rejection path on storage
 locations, capacity rows and plan lines.
 
+The login system adds another 24: the password policy and digest handling, the
+session token and its stored form, resolving a session from a cookie or a
+bearer header, and a table driving every role against every guarded route —
+including that a viewer is refused a posting, that a warehouse hand is refused
+master data, and that with authentication off none of it applies.
+
 Integration tests are build-tagged so the default run stays hermetic:
 
 ```bash
@@ -404,13 +459,21 @@ SPP_TEST_DATABASE_URL="postgres://localhost/spp_test" \
   go test -tags=integration -count=1 ./...
 ```
 
-Twelve tests covering what the unit tests cannot: the SQL, migration
+Nineteen tests covering what the unit tests cannot: the SQL, migration
 idempotency, the seeded season still reconciling with the summary report, every
 plan line balancing, the capacity rules against real master data, balances
 following posted movements, the master data round trip, optimistic locking
 under a concurrent edit, reservations bounding available stock, and plan
 openings carrying forward. They create the schema themselves and reverse every
 change they make, so they can run repeatedly against the same database.
+
+Seven of them are the login system end to end: a session issued and resolved and
+revoked, a wrong password and an unknown user rejected in exactly the same
+words, five failures holding the account and the hold then lifting, a
+deactivated account losing its sessions at once, a password change revoking
+every session including the one that made it, the last administrator unable to
+demote themselves — and the whole HTTP stack refusing and permitting the right
+things per role.
 
 ## CI
 
@@ -421,6 +484,7 @@ change they make, so they can run repeatedly against the same database.
 | **backend** | `gofmt`, `go vet` (including the integration build), `go test -race`, `go build` |
 | **integration** | Migrations against a real PostgreSQL 16, applied twice to prove idempotency, then the tagged tests |
 | **seed-drift** | Regenerates the season seed from the workbook and fails if the committed file differs |
+| **docker** | Builds the image and runs it against PostgreSQL: migrations apply, the dashboard is served, and with `SPP_AUTH_MODE=local` an anonymous call is refused while a signed-in viewer reads and is refused a posting |
 | **webapp** | `npm ci`, both build variants, and that the bundled build can actually bootstrap |
 
 The seed-drift job is the one worth understanding: the generator asserts every

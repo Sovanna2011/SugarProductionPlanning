@@ -15,6 +15,13 @@
 
 		<headerContent>
 			<Button icon="sap-icon://refresh" tooltip="{i18n>refresh}" press=".onRefresh"/>
+			<Button
+				id="userButton"
+				icon="sap-icon://person-placeholder"
+				text="{app>/session/displayName}"
+				tooltip="{i18n>signedInTitle}"
+				visible="{app>/session/loginRequired}"
+				press=".onOpenUserMenu"/>
 		</headerContent>
 
 		<content>

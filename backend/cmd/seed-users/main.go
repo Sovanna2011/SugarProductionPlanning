@@ -38,53 +38,6 @@ import (
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/store/postgres"
 )
 
-// demoAccount is one of the accounts -demo creates.
-//
-// The passwords are here in the source, and that is the point: they are not
-// secrets, they are fixtures. They are long enough to satisfy the password
-// policy so that the accounts exercise the same path a real one would.
-type demoAccount struct {
-	username string
-	name     string
-	email    string
-	roles    []string
-	password string
-	remark   string
-}
-
-var demoAccounts = []demoAccount{
-	{
-		username: "admin", name: "System Administrator",
-		email: "admin@demo.kss.local",
-		roles: []string{auth.RoleAdmin}, password: "Demo-Admin-2027",
-		remark: "Everything, including user administration and forcing a blocked posting.",
-	},
-	{
-		username: "planner", name: "Production Planner",
-		email: "planner@demo.kss.local",
-		roles: []string{auth.RolePlanner}, password: "Demo-Planner-2027",
-		remark: "Maintains master data and the daily storage plan. Cannot post stock.",
-	},
-	{
-		username: "warehouse", name: "Warehouse Supervisor",
-		email: "warehouse@demo.kss.local",
-		roles: []string{auth.RoleWarehouse}, password: "Demo-Store-2027",
-		remark: "Posts receipts, issues and reservations. Cannot change master data.",
-	},
-	{
-		username: "refinery", name: "Refinery Shift Lead",
-		email: "refinery@demo.kss.local",
-		roles: []string{auth.RoleWarehouse, auth.RolePlanner}, password: "Demo-Refinery-2027",
-		remark: "Two roles at once: moves stock and maintains the plan.",
-	},
-	{
-		username: "viewer", name: "Management Viewer",
-		email: "viewer@demo.kss.local",
-		roles: []string{auth.RoleViewer}, password: "Demo-Viewer-2027",
-		remark: "Reads every screen. Every write is refused.",
-	},
-}
-
 func main() {
 	var (
 		dsn         = flag.String("database-url", os.Getenv("SPP_DATABASE_URL"), "PostgreSQL connection string")
@@ -137,53 +90,56 @@ func seedDemo(ctx context.Context, store *postgres.Store, reset bool) error {
 	fmt.Println("so this database must not be used for anything real.")
 	fmt.Println()
 
+	// Every demo account shares one password, so trying the system as four
+	// different people does not mean looking up four passwords. Hashing it
+	// once rather than per account also keeps this quick.
+	digest, err := auth.HashPassword(auth.DemoPassword)
+	if err != nil {
+		return err
+	}
+
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "USER\tPASSWORD\tROLES\tWHAT IT CAN DO")
+	fmt.Fprintln(w, "USER\tROLES\tWHAT IT CAN DO")
 
-	for _, a := range demoAccounts {
-		// A demo account is created with the password already accepted, not
-		// flagged for change: the point is to sign in as it and use the
-		// system, and a forced password change on every login would make the
-		// fixture useless.
-		digest, err := auth.HashPassword(a.password)
-		if err != nil {
-			return err
-		}
-
-		existing, err := store.GetUserByUsername(ctx, a.username)
+	for _, a := range auth.DemoAccounts {
+		existing, err := store.GetUserByUsername(ctx, a.Username)
 		switch {
 		case err == nil && !reset:
-			fmt.Fprintf(w, "%s\t(unchanged)\t%s\t%s\n", a.username, strings.Join(existing.Roles, " "), a.remark)
+			fmt.Fprintf(w, "%s\t%s\t(already exists, unchanged)\n", a.Username, strings.Join(existing.Roles, " "))
 			continue
 		case err == nil:
+			// A demo account keeps the password it is given rather than being
+			// flagged to change it: the point is to sign in and use the
+			// system, and a forced change on every login makes the fixture
+			// useless.
 			if err := store.SetPassword(ctx, existing.ID, digest, false, "seed-users"); err != nil {
 				return err
 			}
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", a.username, a.password, strings.Join(existing.Roles, " "), a.remark)
+			fmt.Fprintf(w, "%s\t%s\t%s\n", a.Username, strings.Join(existing.Roles, " "), a.Remark)
 			continue
 		case !errors.Is(err, pgx.ErrNoRows):
 			return err
 		}
 
 		created, err := store.InsertUser(ctx, domain.User{
-			Username:    a.username,
-			DisplayName: a.name,
-			Email:       a.email,
-			Roles:       a.roles,
+			Username:    a.Username,
+			DisplayName: a.Name,
+			Email:       a.Email,
+			Roles:       a.Roles,
 			Status:      domain.StatusActive,
 			IsDemo:      true,
-			Remark:      a.remark,
+			Remark:      a.Remark,
 		}, digest, "seed-users")
 		if err != nil {
-			return fmt.Errorf("create %s: %w", a.username, err)
+			return fmt.Errorf("create %s: %w", a.Username, err)
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", created.Username, a.password, strings.Join(created.Roles, " "), a.remark)
+		fmt.Fprintf(w, "%s\t%s\t%s\n", created.Username, strings.Join(created.Roles, " "), a.Remark)
 	}
 
 	if err := w.Flush(); err != nil {
 		return err
 	}
-	fmt.Println()
+	fmt.Printf("\nThe password for all of them is: %s\n\n", auth.DemoPassword)
 	fmt.Println("Start the server with SPP_AUTH_MODE=local to sign in with these.")
 	fmt.Println("Remove them again with: spp-seed-users -remove-demo")
 	return nil

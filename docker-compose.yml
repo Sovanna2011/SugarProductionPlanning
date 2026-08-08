@@ -35,6 +35,22 @@ services:
       SPP_WEB_DIR: /app/web
       SPP_AUTO_MIGRATE: "true"
       SPP_LOG_LEVEL: ${SPP_LOG_LEVEL:-info}
+
+      # Authentication is off by default, which is only safe on a trusted
+      # network — the server says so on every start.
+      #
+      # To require a sign-in, set SPP_AUTH_MODE=local and create accounts:
+      #
+      #   SPP_AUTH_MODE=local docker compose up -d app
+      #   docker compose exec app spp-seed-users -demo          # one per role, to try it out
+      #   docker compose exec app spp-seed-users -admin <name>  # a real administrator
+      #
+      # Set SPP_SESSION_COOKIE_SECURE=true wherever this is served over HTTPS,
+      # and see docs/security.md.
+      SPP_AUTH_MODE: ${SPP_AUTH_MODE:-none}
+      SPP_OVERRIDE_ROLE: ${SPP_OVERRIDE_ROLE:-}
+      SPP_SESSION_TTL: ${SPP_SESSION_TTL:-12h}
+      SPP_SESSION_COOKIE_SECURE: ${SPP_SESSION_COOKIE_SECURE:-false}
     ports:
       - "${SPP_PORT:-8080}:8080"
     depends_on:

@@ -186,9 +186,51 @@ jobs:
           curl -fsS -o /dev/null http://127.0.0.1:8080/index.html
           curl -fsS -o /dev/null http://127.0.0.1:8080/resources/sap-ui-core.js
 
+          # With no authentication configured, nothing is gated.
+          curl -fsS -o /dev/null http://127.0.0.1:8080/api/v1/factories
+
+      # The login system is only real if the shipped image can serve it: the
+      # seeding command, the sign-in, and the refusal that follows from a role.
+      - name: Check the login system in the image
+        run: |
+          docker exec spp spp-seed-users -demo
+
+          docker rm -f spp
+          docker run -d --name spp-auth --network host \
+            -e SPP_DATABASE_URL='postgres://spp:spp@127.0.0.1:5432/spp?sslmode=disable' \
+            -e SPP_ADDR=':8080' \
+            -e SPP_AUTH_MODE=local \
+            -e SPP_OVERRIDE_ROLE=ADMIN \
+            kss-spp:ci
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:8080/api/v1/health >/dev/null 2>&1 && break
+            sleep 1
+          done
+
+          # Anonymous is refused, and the login screen's own calls are not.
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/api/v1/factories)" = 401
+          curl -fsS -o /dev/null http://127.0.0.1:8080/api/v1/auth/config
+          curl -fsS -o /dev/null http://127.0.0.1:8080/index.html
+
+          # A viewer reads and does not write.
+          token=$(curl -fsS -X POST http://127.0.0.1:8080/api/v1/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"viewer","password":"Demo-Sugar-2027"}' \
+            | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+          test -n "$token"
+          curl -fsS -o /dev/null -H "Authorization: Bearer $token" http://127.0.0.1:8080/api/v1/factories
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
+            -d '{"factoryId":1,"movementDate":"2027-02-15T00:00:00Z","movementType":"WAREHOUSE_RECEIPT","storageCode":"RAW-WH01","productCode":"RAW-SUGAR","packagingCode":"PKG-BULK","weightQuantity":1}' \
+            http://127.0.0.1:8080/api/v1/inventory/movements)
+          test "$code" = 403
+
+      # Both containers, because either one can be the reason a step failed.
       - name: Container logs
         if: always()
-        run: docker logs spp || true
+        run: |
+          docker logs spp || true
+          docker logs spp-auth || true
 
   webapp:
     name: UI5 dashboard build

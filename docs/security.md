@@ -37,8 +37,8 @@ a static binary with no shell dependencies beyond busybox.
 
 ## Authentication
 
-The plumbing is in place and the mechanism is pluggable, because which one is
-right depends on what the factory already runs.
+The mechanism is pluggable, because which one is right depends on what the
+factory already runs.
 
 Once a request is authenticated, **the audit trail takes the actor from the
 authenticated identity and ignores the `postedBy` / `updatedBy` field in the
@@ -53,20 +53,144 @@ authorised it has to mean something.
 
 | Mode | Behaviour |
 |---|---|
-| `none` *(default)* | No authentication. Every endpoint is open and the actor falls back to whatever the caller declared. The server logs a warning naming this file on every start. |
+| `none` *(default)* | No authentication. Every endpoint is open, no roles are checked, and the actor falls back to whatever the caller declared. The server logs a warning naming this file on every start. |
+| `local` | The application's own user table. People sign in with a name and password and receive a server-side session. Needs nothing beyond the database that is already there. |
 | `proxy` | Trusts an upstream reverse proxy to have authenticated the user and to pass the identity in a header. |
+
+#### `local`
+
+```bash
+SPP_AUTH_MODE=local
+SPP_SESSION_TTL=12h                  # how long a session lasts, whatever the activity
+SPP_SESSION_COOKIE=spp_session       # the cookie name
+SPP_SESSION_COOKIE_SECURE=true       # required wherever the site is served over HTTPS
+```
+
+What it does:
+
+- **Passwords are bcrypt digests** at cost 11. The password itself is never
+  stored, never logged, and never returned.
+- **Sessions are server-side, and only the SHA-256 of the token is stored.** A
+  copy of the database yields no usable session. Revoking one — a sign-out, a
+  password change, a deactivated account — takes effect on the next request
+  rather than at the next expiry.
+- **The session cookie is `HttpOnly` and `SameSite=Lax`**, so a cross-site
+  scripting bug cannot read it and another site cannot cause the browser to
+  send it on a form post. `Secure` is off by default because a plain-HTTP
+  evaluation deployment would otherwise have a cookie the browser silently
+  discards, which looks exactly like a broken login; **turn it on for any
+  deployment reached over HTTPS.**
+- **Sign-in failures are indistinguishable.** A wrong password, an unknown
+  user and a deactivated account all return the same sentence, so the staff
+  list cannot be enumerated from the login screen. An account that cannot sign
+  in still costs a bcrypt comparison, so it cannot be identified by timing
+  either.
+- **Five wrong passwords hold the account for fifteen minutes.** It is a delay,
+  not a lock: guessing becomes hopeless, while somebody who mistyped their
+  password is not shut out until an administrator rescues them.
+- **A password set by somebody else is flagged.** The account may read and may
+  change that password. Every other write is refused until it does, because
+  until then the audit trail cannot honestly say the action was theirs.
+
+`Authorization: Bearer <token>` is accepted as well as the cookie, so the API
+can be exercised with `curl` and from test code. The token is in the login
+response body for that reason.
+
+#### `proxy`
 
 ```bash
 SPP_AUTH_MODE=proxy
 SPP_AUTH_USER_HEADER=X-Forwarded-User      # the subject; this is what is recorded
 SPP_AUTH_NAME_HEADER=X-Forwarded-Name      # optional display name
-SPP_AUTH_ROLES_HEADER=X-Forwarded-Groups   # optional, comma separated
+SPP_AUTH_ROLES_HEADER=X-Forwarded-Groups   # the roles; see the table below
 ```
 
 **`proxy` mode is only as trustworthy as the network in front of it.** The
 header is believed unconditionally, so the application must be reachable *only*
 through the proxy. If a caller can connect to the port directly, they can set
 the header themselves and the mode buys nothing.
+
+Since roles are now enforced, a proxy deployment **must** pass the roles header
+with values from the table below, or its users will be able to read everything
+and change nothing.
+
+### Roles
+
+Roles describe jobs on the site rather than screens in the application, so a
+new screen inherits an answer to "who may use this" instead of needing a new
+role invented for it.
+
+| Role | May |
+|---|---|
+| `ADMIN` | Everything, including user administration and forcing a blocked posting |
+| `PLANNER` | Maintain master data and the daily storage plan |
+| `WAREHOUSE` | Post receipts, issues, transfers and reservations |
+| `VIEWER` | Read every screen; every write is refused |
+
+The rules are one table in `internal/httpapi/auth.go`, checked in order, rather
+than a check scattered across thirty handlers — which is how an endpoint ends
+up quietly open.
+
+| Endpoint | Needs |
+|---|---|
+| `/api/v1/admin/**` | `ADMIN` |
+| `POST`/`PUT` `/api/v1/master/**` | `ADMIN` or `PLANNER` |
+| `POST /api/v1/planning/**` | `ADMIN` or `PLANNER` |
+| `POST /api/v1/inventory/movements/validate` | any signed-in user |
+| `POST /api/v1/inventory/**` | `ADMIN` or `WAREHOUSE` |
+| everything else | any signed-in user |
+
+Asking whether a receipt *would* fit is a read dressed as a `POST`, which is
+why validation stays open — it is how a planner checks a plan.
+
+Reachable without a session, because a browser has to load the application and
+ask about it before anyone has signed in: `/api/v1/health`,
+`/api/v1/auth/config`, `/api/v1/auth/login`, `/api/v1/auth/me`,
+`/api/v1/auth/logout`, and the static files.
+
+Roles match case-insensitively, because identity providers disagree about
+casing. A role the system does not enforce is refused at the point of granting
+it rather than stored and ignored: a role that grants nothing but looks like it
+does is worse than no role at all.
+
+### Accounts
+
+No account is created by a migration. A migration runs on every deployment, so
+seeding accounts there would give every installation the same known passwords
+and there would be no moment at which somebody decided that was acceptable.
+
+```bash
+spp-seed-users -admin sovanna -name "Hang Sovanna"   # one administrator, password printed once
+spp-seed-users -demo                                 # the fixture accounts, for evaluation
+spp-seed-users -remove-demo                          # deactivate them again
+```
+
+### The demo accounts
+
+`spp-seed-users -demo` creates one account per role so the role separation can
+be tried out — signed in as each in turn, seeing which buttons appear and which
+postings are refused.
+
+| User | Roles | Demonstrates |
+|---|---|---|
+| `admin` | `ADMIN` | Everything, including user administration |
+| `planner` | `PLANNER` | Master data and the plan; cannot post stock |
+| `warehouse` | `WAREHOUSE` | Receipts, issues, reservations; cannot change master data |
+| `refinery` | `WAREHOUSE`, `PLANNER` | Two roles at once |
+| `viewer` | `VIEWER` | Reads everything; every write is refused |
+
+**They all share the password `Demo-Sugar-2027`,** which is in the source, in
+this file, and on the login screen of any deployment that has them. One
+password across five accounts is exactly what nobody should do with real ones;
+it is right here for the same reason it is wrong there — these accounts exist
+to be used by whoever has the page open.
+
+That is only acceptable because a database holding them says so. The accounts
+carry an `is_demo` flag, the server counts them and warns on **every start**,
+the login screen labels them, and the user list tags them. Run
+`spp-seed-users -remove-demo` before the system holds anything real; the
+accounts are deactivated rather than deleted, so the audit trail still names
+them.
 
 ### What is still open
 
@@ -76,20 +200,30 @@ about the factory's environment, not something to impose by default — but it
 means the warning at startup is the only thing standing between a fresh
 deployment and an open system.
 
-**Only the capacity override is authorised.** Roles are carried into the
-request context and `SPP_OVERRIDE_ROLE` gates the one operation the
-requirement says needs authorising. No other endpoint checks roles, so any
-authenticated user can still read anything and change master data.
-
 **A request that skips the proxy is anonymous, not rejected.** Under `proxy`
 mode a request arriving without the header is logged as a warning and treated
 as unauthenticated rather than refused, because in a correct deployment it
-cannot happen and refusing would mostly break local debugging. Once a mechanism
-is settled, this should become a 401.
+cannot happen and refusing would mostly break local debugging. `local` mode
+does reject: it has a login screen to send the caller to.
 
 **No OIDC.** If the factory would rather the application validate tokens from
 an identity provider directly than trust a proxy, that is a new `Mode` in
 `internal/auth` and nothing else changes.
+
+**No password reset by email.** An administrator issues a new password, which
+is shown once and must be changed at first sign-in. That suits a site where
+the administrator and the user are on the same premises; it does not scale
+beyond that.
+
+**Sessions do not slide.** A session lasts `SPP_SESSION_TTL` from the moment it
+was issued, whatever the activity, so somebody working a long shift is signed
+out mid-shift. Twelve hours is chosen to cover one; a shorter TTL would need
+renewal on activity to be usable.
+
+**No rate limiting on the login endpoint itself.** The per-account throttle
+stops guessing at one account; it does nothing about one guess each against a
+thousand accounts. That needs a limit in front of the endpoint, which belongs
+in the proxy.
 
 ### Authorising capacity overrides
 
@@ -98,8 +232,8 @@ business rule explicitly permits an override". `SPP_OVERRIDE_ROLE` names the
 role a user must hold to force a blocked posting.
 
 ```bash
-SPP_AUTH_MODE=proxy
-SPP_OVERRIDE_ROLE=warehouse-supervisor
+SPP_AUTH_MODE=local
+SPP_OVERRIDE_ROLE=ADMIN
 ```
 
 | Situation | Result |
@@ -109,11 +243,17 @@ SPP_OVERRIDE_ROLE=warehouse-supervisor
 | Role configured, user lacks it | `403`, naming who was refused |
 | Role configured, user holds it | Posts, with the override flag, reason and the authenticated actor recorded |
 
-Roles match case-insensitively, because identity providers disagree about
-casing.
+### CORS
 
-**CORS is `Access-Control-Allow-Origin: *`,** which is harmless while there are
-no credentials to steal and should be narrowed once there are.
+`Access-Control-Allow-Origin: *` with no `Allow-Credentials`. A browser
+refuses to send the session cookie cross-origin against a wildcard, so another
+site cannot read a signed-in user's data — and under `local` mode an
+uncredentialed cross-origin request is answered `401` anyway.
+
+The cost is that the UI5 app's `?api=http://host:port` override does not work
+against a `local`-mode server: the cookie is same-origin only. Serving the app
+from the API process, which is what the Docker image does, is the supported
+arrangement.
 
 ## Other things to settle before production
 
@@ -121,8 +261,11 @@ no credentials to steal and should be narrowed once there are.
   `SPP_DB_PASSWORD`, but the default should not survive a real deployment, and
   the database port should not be published outside the compose network.
 - **TLS terminates wherever you put it.** The server speaks plain HTTP; put it
-  behind a proxy that terminates TLS.
+  behind a proxy that terminates TLS — and set `SPP_SESSION_COOKIE_SECURE=true`
+  when you do, or the session cookie will travel over plain HTTP on any
+  request that reaches the server directly.
 - **No rate limiting.** Reasonable for an internal system on a trusted network,
-  worth revisiting if it is ever exposed more widely.
+  worth revisiting if it is ever exposed more widely. The login endpoint is
+  the one that would benefit first.
 - **Backups.** The movement ledger is the system of record for stock; the
   planning workbook is not a substitute for backing it up.

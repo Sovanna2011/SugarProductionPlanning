@@ -14,7 +14,19 @@ sap.ui.define([
 		onInit: function () {
 			this._model = this.getAppModel();
 			this._api = this.getApiBase();
-			this._loadMasterData().then(this._loadDashboard.bind(this));
+
+			// Loading on the route rather than on init means the dashboard is
+			// current whenever it is reached — including on the way back from
+			// the login screen, where the previous occupant's data would
+			// otherwise still be on it.
+			this.getRouter().getRoute("dashboard").attachPatternMatched(this._onRouteMatched, this);
+		},
+
+		_onRouteMatched: function () {
+			var that = this;
+			return this._loadMasterData().then(function () {
+				return that._loadDashboard();
+			});
 		},
 
 		/** Opens the master data maintenance screens. */
