@@ -127,6 +127,8 @@ func (a *API) handle(w http.ResponseWriter, r *http.Request, fn func() (any, err
 			status = http.StatusNotFound
 		case errors.Is(err, service.ErrConflict):
 			status = http.StatusConflict
+		case errors.Is(err, service.ErrForbidden):
+			status = http.StatusForbidden
 		}
 		a.fail(w, r, status, err)
 		return

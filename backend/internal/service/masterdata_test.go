@@ -1,9 +1,13 @@
 package service
 
 import (
+	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/sovanna2011/sugarproductionplanning/backend/internal/auth"
 )
 
 func day(y int, m time.Month, d int) *time.Time {
@@ -306,5 +310,59 @@ func TestStoragePlanLineRejections(t *testing.T) {
 				t.Fatal("expected a validation error")
 			}
 		})
+	}
+}
+
+// --- capacity override authorisation (requirement section 24.5) -------------
+
+func TestOverrideIsOpenWhenNoRoleIsConfigured(t *testing.T) {
+	// The default: overrides work exactly as they did before.
+	svc := &Service{}
+	if err := svc.mayOverride(context.Background()); err != nil {
+		t.Errorf("expected overrides to be open by default, got %v", err)
+	}
+}
+
+func TestOverrideRequiresAuthenticationOnceARoleIsConfigured(t *testing.T) {
+	// Configuring a role without enabling authentication must refuse every
+	// override rather than silently allow them: a misconfiguration should fail
+	// closed, not open.
+	svc := &Service{overrideRole: "warehouse-supervisor"}
+
+	err := svc.mayOverride(context.Background())
+	if err == nil {
+		t.Fatal("an anonymous request must not be able to force a blocked posting")
+	}
+	if !errors.Is(err, ErrForbidden) {
+		t.Errorf("error should wrap ErrForbidden, got %v", err)
+	}
+}
+
+func TestOverrideRefusedWithoutTheRole(t *testing.T) {
+	svc := &Service{overrideRole: "warehouse-supervisor"}
+	ctx := auth.WithIdentity(context.Background(), auth.Identity{
+		Subject: "sovanna.hang", Roles: []string{"finance"},
+	})
+
+	err := svc.mayOverride(ctx)
+	if err == nil {
+		t.Fatal("a user without the role must not be able to force a blocked posting")
+	}
+	if !errors.Is(err, ErrForbidden) {
+		t.Errorf("error should wrap ErrForbidden, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "sovanna.hang") {
+		t.Errorf("the refusal should name who was refused, got %q", err)
+	}
+}
+
+func TestOverrideAllowedWithTheRole(t *testing.T) {
+	svc := &Service{overrideRole: "warehouse-supervisor"}
+	ctx := auth.WithIdentity(context.Background(), auth.Identity{
+		Subject: "plant.manager", Roles: []string{"finance", "Warehouse-Supervisor"},
+	})
+
+	if err := svc.mayOverride(ctx); err != nil {
+		t.Errorf("a user holding the role should be permitted, got %v", err)
 	}
 }

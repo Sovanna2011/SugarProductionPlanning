@@ -127,6 +127,7 @@ or change the bootstrap `src` in `webapp/index.html` to use the SAP CDN.
 | `SPP_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
 | `SPP_AUTH_MODE` | `none` | `none` or `proxy`. See [docs/security.md](docs/security.md) |
 | `SPP_AUTH_USER_HEADER` | `X-Forwarded-User` | Identity header under `proxy` mode |
+| `SPP_OVERRIDE_ROLE` | *(none)* | Role required to force a blocked posting. Unset leaves overrides open |
 
 ## The capacity rules
 
@@ -175,6 +176,8 @@ the building is already full of white sugar.
 
 A blocked posting can be forced with `"override": true` and a reason, which is
 stored on the movement for audit. An override without a reason is rejected.
+Set `SPP_OVERRIDE_ROLE` to restrict overrides to a role, which is what
+section 24.5's "authorized business rule" asks for; unset, anyone may override.
 
 Use `POST /api/v1/inventory/movements/validate` to run the same checks as a dry
 run.

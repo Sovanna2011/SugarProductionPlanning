@@ -67,7 +67,12 @@ func run() error {
 		log.Info("authentication enabled", "mode", cfg.Auth.Mode, "userHeader", cfg.Auth.UserHeader)
 	}
 
-	api := httpapi.New(service.New(store), log, cfg.WebDir, cfg.Auth)
+	svc := service.New(store, service.WithOverrideRole(cfg.OverrideRole))
+	if cfg.OverrideRole != "" {
+		log.Info("capacity overrides restricted", "role", cfg.OverrideRole)
+	}
+
+	api := httpapi.New(svc, log, cfg.WebDir, cfg.Auth)
 	srv := &http.Server{
 		Addr:              cfg.Addr,
 		Handler:           api.Routes(),

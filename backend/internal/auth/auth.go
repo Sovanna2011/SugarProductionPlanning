@@ -56,6 +56,20 @@ type Identity struct {
 	Roles []string
 }
 
+// HasRole reports whether the identity carries a role, case-insensitively
+// because identity providers disagree about casing.
+func (i Identity) HasRole(role string) bool {
+	if role == "" {
+		return true
+	}
+	for _, held := range i.Roles {
+		if strings.EqualFold(held, role) {
+			return true
+		}
+	}
+	return false
+}
+
 // String renders the identity for an audit column.
 func (i Identity) String() string {
 	if i.Name != "" && i.Name != i.Subject {

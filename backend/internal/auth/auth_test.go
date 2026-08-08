@@ -133,3 +133,24 @@ func TestIdentityString(t *testing.T) {
 		t.Errorf("String = %q, want the name not repeated", got)
 	}
 }
+
+func TestHasRole(t *testing.T) {
+	id := Identity{Subject: "a.user", Roles: []string{"Planners", "warehouse-supervisor"}}
+
+	if !id.HasRole("planners") {
+		t.Error("roles must match case-insensitively; providers disagree about casing")
+	}
+	if !id.HasRole("WAREHOUSE-SUPERVISOR") {
+		t.Error("roles must match case-insensitively")
+	}
+	if id.HasRole("finance") {
+		t.Error("a role that is not held must not match")
+	}
+	// An empty requirement is no requirement.
+	if !id.HasRole("") {
+		t.Error("an empty role requirement should always pass")
+	}
+	if (Identity{Subject: "nobody"}).HasRole("planners") {
+		t.Error("an identity with no roles holds none")
+	}
+}

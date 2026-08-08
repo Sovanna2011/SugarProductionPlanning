@@ -29,7 +29,7 @@ to where it is implemented.
 | 21 | PostgreSQL storage master design | `backend/migrations/0001`–`0004`; all listed tables plus audit and version columns |
 | 22 | Product capacity table | `storage_product_capacity` with every listed field |
 | 23 | Inventory balance structure | `inventory_balances` unique on location + product + packaging + batch |
-| 24 | Capacity validation | `capacity.Validate` — physical, product, package, safe, plus product-allowed and mixed-products. Blocking findings need an authorised override with a reason |
+| 24 | Capacity validation | `capacity.Validate` — physical, product, package, safe, plus product-allowed and mixed-products. Blocking findings need an override with a reason, and `SPP_OVERRIDE_ROLE` restricts who may give one (§24.5) |
 | 25 | Updated storage process | Modelled by storage types, groups and movement types |
 | 26 | Final storage requirement | The dashboard reports physical, product and package capacity, current, reserved, available stock, available capacity, utilisation and projected capacity |
 | — | "All values must be configurable" (§§3, 4, 5, 12, 18, 22, 26) | Master data is maintained through the API with validation and optimistic locking, not by editing SQL |

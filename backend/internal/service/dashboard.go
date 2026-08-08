@@ -15,10 +15,30 @@ import (
 // Service holds the dependencies shared by every operation.
 type Service struct {
 	store *postgres.Store
+	// overrideRole, when set, is the role a user must hold to force a posting
+	// that capacity validation blocked. Empty means no restriction.
+	overrideRole string
+}
+
+// Option configures a Service.
+type Option func(*Service)
+
+// WithOverrideRole restricts capacity overrides to holders of a role
+// (requirement section 24.5: "unless an authorized business rule explicitly
+// permits an override"). Empty leaves overrides open to anyone, which is the
+// default and the original behaviour.
+func WithOverrideRole(role string) Option {
+	return func(s *Service) { s.overrideRole = role }
 }
 
 // New builds a Service.
-func New(store *postgres.Store) *Service { return &Service{store: store} }
+func New(store *postgres.Store, opts ...Option) *Service {
+	s := &Service{store: store}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
+}
 
 // Store exposes the store for handlers that only need a straight read.
 func (s *Service) Store() *postgres.Store { return s.store }

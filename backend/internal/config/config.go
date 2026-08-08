@@ -25,6 +25,9 @@ type Config struct {
 	// Auth selects how requests are authenticated. Defaults to none, which
 	// preserves the original behaviour and is only safe on a trusted network.
 	Auth auth.Config
+	// OverrideRole, when set, is the role required to force a posting that
+	// capacity validation blocked. Empty leaves overrides open to anyone.
+	OverrideRole string
 	// ShutdownTimeout bounds graceful shutdown.
 	ShutdownTimeout time.Duration
 }
@@ -38,6 +41,7 @@ func Load() (Config, error) {
 		AutoMigrate:     env("SPP_AUTO_MIGRATE", "true") == "true",
 		LogLevel:        env("SPP_LOG_LEVEL", "info"),
 		ShutdownTimeout: 15 * time.Second,
+		OverrideRole:    env("SPP_OVERRIDE_ROLE", ""),
 		Auth: auth.Config{
 			UserHeader:  env("SPP_AUTH_USER_HEADER", "X-Forwarded-User"),
 			NameHeader:  env("SPP_AUTH_NAME_HEADER", "X-Forwarded-Name"),

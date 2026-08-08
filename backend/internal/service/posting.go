@@ -61,6 +61,9 @@ var ErrNotFound = errors.New("not found")
 // changed it first.
 var ErrConflict = errors.New("conflict")
 
+// ErrForbidden means the caller is known but not permitted to do this.
+var ErrForbidden = errors.New("forbidden")
+
 // ValidateMovement runs the pre-posting capacity checks without writing
 // anything (requirement section 24).
 func (s *Service) ValidateMovement(ctx context.Context, req MovementRequest) (MovementResponse, error) {
@@ -83,6 +86,9 @@ func (s *Service) PostMovement(ctx context.Context, req MovementRequest) (Moveme
 		if req.OverrideReason == "" {
 			return resp, fmt.Errorf("%w: an override requires a reason", ErrValidation)
 		}
+		if err := s.mayOverride(ctx); err != nil {
+			return resp, err
+		}
 	}
 
 	id, err := s.store.PostMovement(ctx, prepared)
@@ -92,6 +98,29 @@ func (s *Service) PostMovement(ctx context.Context, req MovementRequest) (Moveme
 	resp.Posted = true
 	resp.MovementID = id
 	return resp, nil
+}
+
+// mayOverride enforces requirement section 24.5: a blocked posting may be
+// forced only under an authorised business rule.
+//
+// With no role configured, overrides stay open to anyone, which is the
+// original behaviour. With a role configured, the request must carry an
+// authenticated identity holding it — so enabling this without also enabling
+// authentication refuses every override rather than silently allowing them.
+func (s *Service) mayOverride(ctx context.Context) error {
+	if s.overrideRole == "" {
+		return nil
+	}
+	id, ok := auth.FromContext(ctx)
+	if !ok {
+		return fmt.Errorf("%w: forcing a blocked posting requires an authenticated user holding the %q role",
+			ErrForbidden, s.overrideRole)
+	}
+	if !id.HasRole(s.overrideRole) {
+		return fmt.Errorf("%w: %s does not hold the %q role required to force a blocked posting",
+			ErrForbidden, id.Subject, s.overrideRole)
+	}
+	return nil
 }
 
 // prepare resolves master data, derives the second quantity axis and runs the

@@ -76,10 +76,10 @@ about the factory's environment, not something to impose by default — but it
 means the warning at startup is the only thing standing between a fresh
 deployment and an open system.
 
-**Nothing is authorised yet.** Roles are carried from the mechanism into the
-request context, but no endpoint checks them. Any authenticated user can do
-anything, including force a capacity override. Restricting overrides to a
-specific role is the natural next step and the plumbing now exists for it.
+**Only the capacity override is authorised.** Roles are carried into the
+request context and `SPP_OVERRIDE_ROLE` gates the one operation the
+requirement says needs authorising. No other endpoint checks roles, so any
+authenticated user can still read anything and change master data.
 
 **A request that skips the proxy is anonymous, not rejected.** Under `proxy`
 mode a request arriving without the header is logged as a warning and treated
@@ -90,6 +90,27 @@ is settled, this should become a 401.
 **No OIDC.** If the factory would rather the application validate tokens from
 an identity provider directly than trust a proxy, that is a new `Mode` in
 `internal/auth` and nothing else changes.
+
+### Authorising capacity overrides
+
+Section 24.5 permits exceeding physical capacity only "unless an authorized
+business rule explicitly permits an override". `SPP_OVERRIDE_ROLE` names the
+role a user must hold to force a blocked posting.
+
+```bash
+SPP_AUTH_MODE=proxy
+SPP_OVERRIDE_ROLE=warehouse-supervisor
+```
+
+| Situation | Result |
+|---|---|
+| No role configured *(default)* | Anyone may override, with a reason. The original behaviour. |
+| Role configured, request anonymous | `403` — including when authentication is off, so a half-configured deployment fails closed |
+| Role configured, user lacks it | `403`, naming who was refused |
+| Role configured, user holds it | Posts, with the override flag, reason and the authenticated actor recorded |
+
+Roles match case-insensitively, because identity providers disagree about
+casing.
 
 **CORS is `Access-Control-Allow-Origin: *`,** which is harmless while there are
 no credentials to steal and should be narrowed once there are.
