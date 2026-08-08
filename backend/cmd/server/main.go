@@ -15,6 +15,7 @@ import (
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/auth"
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/config"
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/httpapi"
+	"github.com/sovanna2011/sugarproductionplanning/backend/internal/ratelimit"
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/service"
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/store/postgres"
 	"github.com/sovanna2011/sugarproductionplanning/backend/migrations"
@@ -101,7 +102,27 @@ func run() error {
 		log.Info("authentication enabled", "mode", cfg.Auth.Mode, "userHeader", cfg.Auth.UserHeader)
 	}
 
-	api := httpapi.New(svc, log, cfg.WebDir, cfg.Auth, cfg.OverrideRole)
+	opts := httpapi.Options{
+		OverrideRole:   cfg.OverrideRole,
+		TrustedProxies: cfg.TrustedProxies,
+	}
+	if cfg.Auth.Mode == auth.ModeLocal && cfg.LoginMaxFailures > 0 {
+		// 10,000 tracked addresses is a few megabytes and far more than an
+		// internal site has clients. A flood past it stops throttling new
+		// addresses rather than evicting the counters already held, which is
+		// what flooding it would be for.
+		opts.LoginLimit = ratelimit.NewFailures(cfg.LoginMaxFailures, cfg.LoginFailureWindow, 10000)
+		log.Info("failed sign-ins throttled",
+			"perClient", cfg.LoginMaxFailures, "window", cfg.LoginFailureWindow)
+
+		if len(cfg.TrustedProxies) == 0 {
+			log.Info("X-Forwarded-For is ignored, so clients are identified by the address " +
+				"they connect from. Behind a reverse proxy, set SPP_TRUSTED_PROXIES or every " +
+				"request will look like it came from the proxy")
+		}
+	}
+
+	api := httpapi.New(svc, log, cfg.WebDir, cfg.Auth, opts)
 	srv := &http.Server{
 		Addr:              cfg.Addr,
 		Handler:           api.Routes(),

@@ -51,6 +51,12 @@ services:
       SPP_OVERRIDE_ROLE: ${SPP_OVERRIDE_ROLE:-}
       SPP_SESSION_TTL: ${SPP_SESSION_TTL:-12h}
       SPP_SESSION_COOKIE_SECURE: ${SPP_SESSION_COOKIE_SECURE:-false}
+
+      # Behind a reverse proxy, name it here or every client looks like the
+      # proxy and the sign-in limit below becomes one global limit.
+      SPP_TRUSTED_PROXIES: ${SPP_TRUSTED_PROXIES:-}
+      SPP_LOGIN_MAX_FAILURES: ${SPP_LOGIN_MAX_FAILURES:-15}
+      SPP_LOGIN_FAILURE_WINDOW: ${SPP_LOGIN_FAILURE_WINDOW:-15m}
     ports:
       - "${SPP_PORT:-8080}:8080"
     depends_on:

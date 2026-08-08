@@ -6,12 +6,14 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/auth"
+	"github.com/sovanna2011/sugarproductionplanning/backend/internal/ratelimit"
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/service"
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/store/postgres"
 )
@@ -26,12 +28,36 @@ type API struct {
 	// up front whether it may force a blocked posting, rather than letting it
 	// find out from a 403 halfway through one.
 	overrideRole string
+	// trustedProxies are the hops whose X-Forwarded-For may be believed.
+	trustedProxies []*net.IPNet
+	// loginLimit throttles failed sign-ins per client. Nil disables it.
+	loginLimit *ratelimit.Failures
+}
+
+// Options carries the settings that are not the service, the log or the web
+// directory. They arrived one at a time; a struct stops New growing a
+// positional argument per release.
+type Options struct {
+	// OverrideRole is the role required to force a blocked posting.
+	OverrideRole string
+	// TrustedProxies are hops whose X-Forwarded-For header is believed.
+	TrustedProxies []*net.IPNet
+	// LoginLimit throttles failed sign-ins. Nil leaves them unthrottled.
+	LoginLimit *ratelimit.Failures
 }
 
 // New builds the API. webDir, when set, is served at / so the UI5 dashboard and
 // the backend can run from one process in development.
-func New(svc *service.Service, log *slog.Logger, webDir string, authCfg auth.Config, overrideRole string) *API {
-	return &API{svc: svc, log: log, webDir: webDir, auth: authCfg, overrideRole: overrideRole}
+func New(svc *service.Service, log *slog.Logger, webDir string, authCfg auth.Config, opts Options) *API {
+	return &API{
+		svc:            svc,
+		log:            log,
+		webDir:         webDir,
+		auth:           authCfg,
+		overrideRole:   opts.OverrideRole,
+		trustedProxies: opts.TrustedProxies,
+		loginLimit:     opts.LoginLimit,
+	}
 }
 
 // Routes returns the configured mux.

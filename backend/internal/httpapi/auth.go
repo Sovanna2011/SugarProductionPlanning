@@ -2,8 +2,9 @@ package httpapi
 
 import (
 	"errors"
-	"net"
+	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -167,13 +168,30 @@ func (a *API) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	client := ClientIP(r, a.trustedProxies)
+
+	// The per-account hold in the service stops guessing at one password. This
+	// stops one guess each against every account, which no single account's
+	// counter would ever notice.
+	if a.loginLimit != nil {
+		if ok, retryAfter := a.loginLimit.Allow(client); !ok {
+			seconds := int(retryAfter.Seconds()) + 1
+			w.Header().Set("Retry-After", strconv.Itoa(seconds))
+			a.log.Warn("sign-in attempts throttled", "client", client, "retryAfterSeconds", seconds)
+			a.fail(w, r, http.StatusTooManyRequests, fmt.Errorf(
+				"too many failed sign-in attempts from this address. Try again in %d minute(s)",
+				(seconds+59)/60))
+			return
+		}
+	}
+
 	req, err := decodeBody[service.LoginRequest](w, r)
 	if err != nil {
 		a.fail(w, r, http.StatusBadRequest, err)
 		return
 	}
 	req.UserAgent = r.UserAgent()
-	req.ClientIP = clientIP(r)
+	req.ClientIP = client
 
 	res, err := a.svc.Login(r.Context(), req)
 	if err != nil {
@@ -181,11 +199,22 @@ func (a *API) login(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case errors.Is(err, service.ErrUnauthorized):
 			status = http.StatusUnauthorized
+			// Only a rejected credential counts. A malformed body or a
+			// database failure is not somebody guessing.
+			if a.loginLimit != nil {
+				a.loginLimit.Record(client)
+			}
 		case errors.Is(err, service.ErrValidation):
 			status = http.StatusBadRequest
 		}
 		a.fail(w, r, status, err)
 		return
+	}
+
+	// Getting it right clears the slate, so two fumbled attempts before a
+	// correct one are not carried for the rest of the window.
+	if a.loginLimit != nil {
+		a.loginLimit.Forget(client)
 	}
 
 	http.SetCookie(w, a.sessionCookie(res.Token, res.ExpiresAt))
@@ -379,16 +408,5 @@ func (a *API) sessionCookie(token string, expires time.Time) *http.Cookie {
 	return c
 }
 
-// clientIP returns the address to record against a session.
-//
-// X-Forwarded-For is deliberately ignored: anyone can send that header, and a
-// session log full of addresses the caller chose is worse than one that
-// honestly records the last hop. A deployment behind a proxy should have the
-// proxy log the original address.
-func clientIP(r *http.Request) string {
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return host
-}
+// The address a request is attributed to is resolved by ClientIP, in
+// clientip.go, which believes X-Forwarded-For only from a configured proxy.

@@ -3,11 +3,14 @@ package config
 
 import (
 	"fmt"
+	"net"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/auth"
+	"github.com/sovanna2011/sugarproductionplanning/backend/internal/httpapi"
 )
 
 // Config is the server configuration.
@@ -28,6 +31,15 @@ type Config struct {
 	// OverrideRole, when set, is the role required to force a posting that
 	// capacity validation blocked. Empty leaves overrides open to anyone.
 	OverrideRole string
+	// TrustedProxies are the hops whose X-Forwarded-For header may be
+	// believed. Empty means the header is ignored entirely.
+	TrustedProxies []*net.IPNet
+	// LoginMaxFailures is how many rejected sign-ins one client address may
+	// make inside LoginFailureWindow before it is turned away. Zero disables
+	// the limit.
+	LoginMaxFailures int
+	// LoginFailureWindow is the period LoginMaxFailures applies over.
+	LoginFailureWindow time.Duration
 	// ShutdownTimeout bounds graceful shutdown.
 	ShutdownTimeout time.Duration
 }
@@ -67,6 +79,30 @@ func Load() (Config, error) {
 			os.Getenv("SPP_SESSION_TTL"))
 	}
 	c.Auth.SessionTTL = ttl
+
+	// Behind a reverse proxy every request appears to come from the proxy, so
+	// a per-client limit would become one global limit that the first attacker
+	// closes for everybody. Naming the proxy is what avoids that.
+	proxies, err := httpapi.ParseTrustedProxies(env("SPP_TRUSTED_PROXIES", ""))
+	if err != nil {
+		return c, fmt.Errorf("SPP_TRUSTED_PROXIES must be a comma-separated list of "+
+			"addresses or CIDR blocks, such as 10.0.0.7,172.16.0.0/12: %w", err)
+	}
+	c.TrustedProxies = proxies
+
+	maxFailures, err := strconv.Atoi(env("SPP_LOGIN_MAX_FAILURES", "15"))
+	if err != nil || maxFailures < 0 {
+		return c, fmt.Errorf("SPP_LOGIN_MAX_FAILURES must be a non-negative whole number, got %q",
+			os.Getenv("SPP_LOGIN_MAX_FAILURES"))
+	}
+	c.LoginMaxFailures = maxFailures
+
+	failureWindow, err := time.ParseDuration(env("SPP_LOGIN_FAILURE_WINDOW", "15m"))
+	if err != nil || failureWindow <= 0 {
+		return c, fmt.Errorf("SPP_LOGIN_FAILURE_WINDOW must be a positive duration such as 15m, got %q",
+			os.Getenv("SPP_LOGIN_FAILURE_WINDOW"))
+	}
+	c.LoginFailureWindow = failureWindow
 
 	if strings.TrimSpace(c.DatabaseURL) == "" {
 		return c, fmt.Errorf("SPP_DATABASE_URL is required, for example postgres://user:pass@localhost:5432/spp")

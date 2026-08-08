@@ -173,6 +173,9 @@ or change the bootstrap `src` in `webapp/index.html` to use the SAP CDN.
 | `SPP_SESSION_TTL` | `12h` | How long a session lasts under `local` mode |
 | `SPP_SESSION_COOKIE` | `spp_session` | Session cookie name under `local` mode |
 | `SPP_SESSION_COOKIE_SECURE` | `false` | Mark the session cookie `Secure`. **Set this wherever the site is served over HTTPS** |
+| `SPP_TRUSTED_PROXIES` | *(none)* | Comma-separated addresses or CIDR blocks whose `X-Forwarded-For` is believed. Set it behind a reverse proxy, or every client looks like the proxy |
+| `SPP_LOGIN_MAX_FAILURES` | `15` | Failed sign-ins one client address may make per window. `0` disables the limit |
+| `SPP_LOGIN_FAILURE_WINDOW` | `15m` | The period that limit applies over |
 | `SPP_OVERRIDE_ROLE` | *(none)* | Role required to force a blocked posting. Unset leaves overrides open |
 
 ## The capacity rules
@@ -259,6 +262,9 @@ POST /auth/login                              {username, password} -> session co
 GET  /auth/me                                 who the caller is, and what they may do
 POST /auth/logout                             ends the session
 POST /auth/change-password                    {currentPassword, newPassword}
+
+Failed sign-ins are throttled per client address and answered 429 with a
+Retry-After. Successes cost nothing, so a shift change is unaffected.
 
 GET  /admin/users                   ?includeInactive       ADMIN only
 POST /admin/users                             create or update an account

@@ -91,10 +91,37 @@ What it does:
 - **A password set by somebody else is flagged.** The account may read and may
   change that password. Every other write is refused until it does, because
   until then the audit trail cannot honestly say the action was theirs.
+- **Failed sign-ins are throttled per client address**, fifteen in fifteen
+  minutes by default, answered `429` with a `Retry-After`. This is the limit
+  the per-account hold cannot provide: one guess each against a hundred
+  accounts never trips any single account's counter. **Only failures count** —
+  a successful sign-in costs nothing and clears the caller's slate, so a shift
+  change where forty people sign in at once is unaffected.
 
 `Authorization: Bearer <token>` is accepted as well as the cookie, so the API
 can be exercised with `curl` and from test code. The token is in the login
 response body for that reason.
+
+#### Who the client is
+
+The rate limiter and the session log both need to know who is calling.
+`X-Forwarded-For` is believed **only** when the request actually arrived from a
+configured proxy:
+
+```bash
+SPP_TRUSTED_PROXIES=10.0.0.7,172.16.0.0/12   # addresses or CIDR blocks
+```
+
+Neither extreme works. Trusting the header always would let a caller pick a
+fresh identity per request and walk straight past the limiter, and write
+anything they liked into the session log. Trusting it never means that behind a
+reverse proxy every request appears to come from the proxy — turning a
+per-client limit into one global limit that the first attacker closes for
+everybody. Only the last hop the trusted chain saw is used; entries to its left
+were supplied by the caller and mean nothing.
+
+Leave it unset when the application is reached directly. The server says on
+start which of the two it is doing.
 
 #### `proxy`
 
@@ -220,10 +247,10 @@ was issued, whatever the activity, so somebody working a long shift is signed
 out mid-shift. Twelve hours is chosen to cover one; a shorter TTL would need
 renewal on activity to be usable.
 
-**No rate limiting on the login endpoint itself.** The per-account throttle
-stops guessing at one account; it does nothing about one guess each against a
-thousand accounts. That needs a limit in front of the endpoint, which belongs
-in the proxy.
+**No password expiry or history.** A password can be changed back to the
+previous one, and none of them age out. Both are deliberate: forced rotation
+mostly produces `Sugar2027!` becoming `Sugar2028!`, and a history check needs
+old digests kept around.
 
 ### Authorising capacity overrides
 
@@ -264,8 +291,13 @@ arrangement.
   behind a proxy that terminates TLS — and set `SPP_SESSION_COOKIE_SECURE=true`
   when you do, or the session cookie will travel over plain HTTP on any
   request that reaches the server directly.
-- **No rate limiting.** Reasonable for an internal system on a trusted network,
-  worth revisiting if it is ever exposed more widely. The login endpoint is
-  the one that would benefit first.
+- **Rate limiting covers sign-in only.** The rest of the API is unthrottled,
+  which is reasonable for an internal system on a trusted network and worth
+  revisiting if it is ever exposed more widely.
+- **The sign-in limiter is per process.** Two instances behind a load balancer
+  each keep their own count, so the effective limit is the configured one times
+  the number of instances. For a shared count it would have to live in the
+  database or in something like Redis; at these rates the difference does not
+  change the conclusion for an attacker.
 - **Backups.** The movement ledger is the system of record for stock; the
   planning workbook is not a substitute for backing it up.

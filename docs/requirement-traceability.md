@@ -29,7 +29,7 @@ to where it is implemented.
 | 21 | PostgreSQL storage master design | `backend/migrations/0001`–`0004`; all listed tables plus audit and version columns |
 | 22 | Product capacity table | `storage_product_capacity` with every listed field |
 | 23 | Inventory balance structure | `inventory_balances` unique on location + product + packaging + batch |
-| 24 | Capacity validation | `capacity.Validate` — physical, product, package, safe, plus product-allowed and mixed-products. Blocking findings need an override with a reason, and `SPP_OVERRIDE_ROLE` restricts who may give one (§24.5) |
+| 24 | Capacity validation | `capacity.Validate` — physical, product, package, safe, plus product-allowed and mixed-products. Blocking findings need an override with a reason, and `SPP_OVERRIDE_ROLE` restricts who may give one (§24.5) — with a login configured, that is a real authenticated identity rather than a name the caller typed |
 | 25 | Updated storage process | Modelled by storage types, groups and movement types |
 | 26 | Final storage requirement | The dashboard reports physical, product and package capacity, current, reserved, available stock, available capacity, utilisation and projected capacity |
 | — | "All values must be configurable" (§§3, 4, 5, 12, 18, 22, 26) | Master data is maintained through the API with validation and optimistic locking, not by editing SQL |
@@ -55,3 +55,13 @@ warehouses afterwards. They are different flows and get their own columns.
 **Finished Sugar Warehouse 2** is seeded inactive with zero capacity: it is in
 the requirement's storage structure but not in the plan, and inventing a
 capacity would have corrupted the 69,000 t total the plan depends on.
+
+**Sign-in and roles** (not in the requirement). §24.5 permits exceeding
+physical capacity "unless an authorized business rule explicitly permits an
+override", which presumes the system can tell who is asking. Nothing else in
+the document describes users at all, so the shape is a judgement call: an
+optional local login (`SPP_AUTH_MODE=local`), four roles named after jobs on
+the site rather than screens in the application, and one route-to-role table
+enforcing them. **With the mode left at its `none` default nothing is
+enforced**, so the requirement's own behaviour is unchanged unless a deployment
+opts in. See [`security.md`](security.md).

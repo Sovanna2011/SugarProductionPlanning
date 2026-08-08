@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -17,16 +18,17 @@ import (
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/auth"
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/domain"
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/httpapi"
+	"github.com/sovanna2011/sugarproductionplanning/backend/internal/ratelimit"
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/service"
 	"github.com/sovanna2011/sugarproductionplanning/backend/internal/store/postgres"
 )
 
 // newTestAPI builds the real HTTP handler, so these tests exercise the same
 // routing, middleware and guard the server does.
-func newTestAPI(t *testing.T, svc *service.Service, cfg auth.Config) http.Handler {
+func newTestAPI(t *testing.T, svc *service.Service, cfg auth.Config, opts httpapi.Options) http.Handler {
 	t.Helper()
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	return httpapi.New(svc, log, "", cfg, auth.RoleAdmin).Routes()
+	return httpapi.New(svc, log, "", cfg, opts).Routes()
 }
 
 // signIn posts credentials and returns the session token.
@@ -390,7 +392,7 @@ func TestTheApiRefusesTheRightThings(t *testing.T) {
 
 	svc := service.New(store, service.WithOverrideRole(auth.RoleAdmin))
 	cfg := auth.Config{Mode: auth.ModeLocal, Sessions: svc, CookieName: "spp_session", SessionTTL: time.Hour}
-	srv := httptest.NewServer(newTestAPI(t, svc, cfg))
+	srv := httptest.NewServer(newTestAPI(t, svc, cfg, httpapi.Options{OverrideRole: auth.RoleAdmin}))
 	t.Cleanup(srv.Close)
 
 	client := srv.Client()
@@ -471,5 +473,104 @@ func TestDuplicateCodeIsAnAnswerNotAFailure(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "version") {
 		t.Fatalf("the message does not say how to update the existing record instead: %v", err)
+	}
+}
+
+// TestSprayingAcrossAccountsIsThrottled covers the gap the per-account hold
+// leaves open: one guess each against every account. No single account ever
+// reaches its own limit, so without a per-client limit nothing notices.
+func TestSprayingAcrossAccountsIsThrottled(t *testing.T) {
+	store, ctx := open(t)
+
+	const password = "Integration-Test-2027"
+	const attempts = 4
+
+	// Enough accounts that each is guessed at only once — well under the five
+	// failures that would hold an account on its own.
+	for i := 0; i < attempts; i++ {
+		account(t, store, ctx, "itest-spray-"+strconv.Itoa(i), password, auth.RoleViewer)
+	}
+
+	svc := service.New(store)
+	cfg := auth.Config{Mode: auth.ModeLocal, Sessions: svc, CookieName: "spp_session", SessionTTL: time.Hour}
+	limit := ratelimit.NewFailures(attempts-1, 15*time.Minute, 100)
+
+	srv := httptest.NewServer(newTestAPI(t, svc, cfg, httpapi.Options{
+		OverrideRole: auth.RoleAdmin,
+		LoginLimit:   limit,
+	}))
+	t.Cleanup(srv.Close)
+
+	attempt := func(username, password string) int {
+		body := `{"username":"` + username + `","password":"` + password + `"}`
+		res, err := srv.Client().Post(srv.URL+"/api/v1/auth/login", "application/json", strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		_, _ = io.Copy(io.Discard, res.Body)
+		return res.StatusCode
+	}
+
+	var refused bool
+	for i := 0; i < attempts; i++ {
+		code := attempt("itest-spray-"+strconv.Itoa(i), "one-guess-each")
+		switch code {
+		case http.StatusUnauthorized:
+			// Still being answered normally.
+		case http.StatusTooManyRequests:
+			refused = true
+		default:
+			t.Fatalf("attempt %d returned %d, want 401 or 429", i+1, code)
+		}
+	}
+	if !refused {
+		t.Fatalf("%d guesses spread across %d accounts were all answered; "+
+			"the per-account hold cannot see this and nothing else did either", attempts, attempts)
+	}
+
+	// The correct password is refused too while the hold stands — the limit is
+	// on the address, not on any one account.
+	if code := attempt("itest-spray-0", password); code != http.StatusTooManyRequests {
+		t.Fatalf("a correct password from the throttled address returned %d, want 429", code)
+	}
+
+	// And it is a hold, not a lockout: once the window closes, signing in works.
+	limit.Forget("127.0.0.1")
+	if code := attempt("itest-spray-0", password); code != http.StatusOK {
+		t.Fatalf("after the hold lifted, a correct password returned %d, want 200", code)
+	}
+}
+
+// TestSuccessDoesNotConsumeTheAllowance is the reason only failures are
+// counted: a shift change where everybody signs in at once, from one address
+// if they are behind a proxy, must not exhaust the limit.
+func TestSuccessDoesNotConsumeTheAllowance(t *testing.T) {
+	store, ctx := open(t)
+
+	const password = "Integration-Test-2027"
+	account(t, store, ctx, "itest-shift", password, auth.RoleViewer)
+
+	svc := service.New(store)
+	cfg := auth.Config{Mode: auth.ModeLocal, Sessions: svc, CookieName: "spp_session", SessionTTL: time.Hour}
+
+	srv := httptest.NewServer(newTestAPI(t, svc, cfg, httpapi.Options{
+		LoginLimit: ratelimit.NewFailures(2, 15*time.Minute, 100),
+	}))
+	t.Cleanup(srv.Close)
+
+	for i := 0; i < 10; i++ {
+		body := `{"username":"itest-shift","password":"` + password + `"}`
+		res, err := srv.Client().Post(srv.URL+"/api/v1/auth/login", "application/json", strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		code := res.StatusCode
+		_, _ = io.Copy(io.Discard, res.Body)
+		res.Body.Close()
+
+		if code != http.StatusOK {
+			t.Fatalf("sign-in %d returned %d; successful sign-ins are consuming the failure allowance", i+1, code)
+		}
 	}
 }
