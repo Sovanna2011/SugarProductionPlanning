@@ -1,0 +1,14 @@
+{
+  "name": "kss-sugar-production-planning-webapp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SAP UI5 Storage Capacity Dashboard for sugar production planning",
+  "scripts": {
+    "start": "ui5 serve --port 8080 --open index.html",
+    "build": "ui5 build --clean-dest",
+    "lint": "eslint webapp"
+  },
+  "devDependencies": {
+    "@ui5/cli": "^4.0.0"
+  }
+}

@@ -1,0 +1,82 @@
+/* Storage Capacity Dashboard styling.
+   Colours are taken from the active SAPUI5 theme rather than hard-coded, so
+   the app follows whichever theme the factory standardises on. */
+
+/* Every element between <body> and the Page must be full height. Without this
+   the Page gives its scrolling section zero height and clips every panel out
+   of view. ComponentSupport inserts its own wrapper div, so the whole chain
+   body > div > ComponentContainer > UIArea > View has to be covered. */
+html,
+body,
+#content > div,
+#content .sapUiComponentContainer,
+#content .sapUiComponentContainer > div,
+#content .sapUiView {
+	height: 100%;
+}
+
+.sppPanel {
+	margin: 0.5rem;
+}
+
+.sppHeaderText {
+	margin-right: 1rem;
+	font-weight: 600;
+}
+
+/* One tank / silo / warehouse tile. */
+.sppCard {
+	background-color: var(--sapTile_Background, #fff);
+	border: 1px solid var(--sapTile_BorderColor, #e5e5e5);
+	border-radius: var(--sapElement_BorderCornerRadius, 0.5rem);
+	padding: 0.75rem 1rem 0.5rem 1rem;
+	height: 100%;
+	box-shadow: var(--sapContent_Shadow0, 0 0 0.125rem rgba(0, 0, 0, 0.1));
+}
+
+.sppBar {
+	margin: 0.75rem 0 0.5rem 0;
+}
+
+/* The current / capacity / safe / available figure row. */
+.sppFigures {
+	margin-top: 0.25rem;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+}
+
+.sppFigures .sapMLabel {
+	font-size: 0.75rem;
+	color: var(--sapContent_LabelColor, #6a6d70);
+}
+
+.sppFigures .sapMText {
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+.sppMuted {
+	color: var(--sapContent_LabelColor, #6a6d70);
+	font-size: 0.8125rem;
+}
+
+.sppRemark {
+	margin-top: 0.5rem;
+	font-style: italic;
+}
+
+.sppProductTable {
+	margin-top: 0.75rem;
+}
+
+/* Keep the numeric columns readable on narrow screens. */
+.sppProductTable .sapMListTblCell {
+	white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+	.sppFigures {
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+}
