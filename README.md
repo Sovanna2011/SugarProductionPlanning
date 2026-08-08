@@ -53,7 +53,7 @@ backend/
     ├── domain/          Entities
     ├── capacity/        Conversion, validation, utilisation, projection  ← the rules
     ├── store/postgres/  Queries
-    ├── service/         Dashboard, projection, plan vs actual, posting
+    ├── service/         Dashboard, projection, plan vs actual, posting, master data
     ├── httpapi/         Routing and JSON
     └── config/          Environment configuration
 webapp/                  SAP UI5 Storage Capacity Dashboard
@@ -128,7 +128,7 @@ Total Weight = Package Quantity × Net Weight per Package
 ```
 
 Package sizes are rows in `packaging_types`, never constants in Go. Adding a
-25 KG or 500 KG bag is an `INSERT`.
+25 KG or 500 KG bag is a `POST /master/packaging-types`.
 
 ### Product limits are not additive capacity
 
@@ -200,6 +200,11 @@ GET  /master/product-packaging
 GET  /master/storage-capacities     ?factoryId&storageCode&productId&date
 GET  /master/threshold-levels       ?factoryId
 GET  /master/movement-types
+
+POST /master/storage-locations                create or update a tank, silo or warehouse
+POST /master/storage-capacities               configure warehouse + product + packaging
+POST /master/packaging-types                  maintain the packaging master
+PUT  /master/threshold-levels                 replace a factory's alert bands
 ```
 
 **Inventory**
@@ -209,6 +214,8 @@ GET  /inventory/balances            ?factoryId&storageCode&storageType&productId
 GET  /inventory/movements           ?factoryId&from&to&limit
 POST /inventory/movements                     post a movement
 POST /inventory/movements/validate            dry run
+POST /inventory/reservations                  commit stock to an order
+POST /inventory/reservations/release          free reserved stock
 ```
 
 **Planning and dashboard**
@@ -217,12 +224,65 @@ POST /inventory/movements/validate            dry run
 GET  /seasons                       ?factoryId
 GET  /planning/production           ?factoryId&seasonId&from&to
 GET  /planning/storage              ?factoryId&scope&from&to
+POST /planning/storage                        save plan lines (one object or an array)
 GET  /planning/projection           ?factoryId&scope&from&days&useActualOpening
 GET  /planning/plan-vs-actual       ?factoryId&date
 GET  /dashboard/storage-capacity    ?factoryId&date&storageType&storageCode&productCode&packagingCode
 GET  /alerts                        ?factoryId&date
 GET  /health
 ```
+
+### Maintaining master data
+
+Everything the requirement calls configurable is maintained through the API,
+not by editing SQL. Omit `version` to create; supply the stored `version` to
+update, and a stale one is refused with `409 Conflict` so two editors cannot
+silently overwrite each other.
+
+```bash
+# A new warehouse, then what it may hold.
+curl -X POST localhost:8080/api/v1/master/storage-locations \
+  -H 'Content-Type: application/json' \
+  -d '{"factoryId":1,"storageCode":"FG-WH04","storageName":"Finished Sugar Warehouse 4",
+       "storageTypeCode":"FINISHED_GOODS_WAREHOUSE","physicalCapacity":30000,
+       "safeCapacityPercentage":95,"allowMixedProducts":true}'
+
+curl -X POST localhost:8080/api/v1/master/storage-capacities \
+  -H 'Content-Type: application/json' \
+  -d '{"storageCode":"FG-WH04","productCode":"WHITE-SUGAR","packagingCode":"PKG-50KG",
+       "maximumPackageQuantity":400000,"maximumWeightQuantity":20000}'
+```
+
+Two rules worth knowing:
+
+- **Package weight is derived, never trusted.** `weightInTon` is computed from
+  `netWeight` and its unit, because it is the single source for every bag/ton
+  conversion. A packaging row whose conversion factor disagrees with its own
+  net weight cannot be saved.
+- **Alert bands are replaced as a set.** They only mean anything as a
+  contiguous cover from 0% upwards with an open-ended top band, so a set with a
+  gap, an overlap or a bounded top band is rejected rather than half-applied.
+
+Capacity changes are guarded but not blocked: shrinking a warehouse below the
+stock inside it is refused unless you pass `"force": true`, and a saved change
+that looks wrong comes back with `warnings` rather than being rejected.
+
+### Reservations
+
+Reserved stock stays on hand and still counts against capacity; what it changes
+is **available** stock, which is what a planner may commit next.
+
+```bash
+curl -X POST localhost:8080/api/v1/inventory/reservations \
+  -H 'Content-Type: application/json' \
+  -d '{"factoryId":1,"storageCode":"FG-WH01","productCode":"REFINED-SUGAR",
+       "packagingCode":"PKG-50KG","batchNo":"R26001","weightQuantity":2000,
+       "referenceDoc":"SO-1001"}'
+```
+
+Reserving more than is available, or releasing more than is reserved, is
+refused. The balance row is locked for the duration, so two concurrent
+reservations cannot both take the same free stock.
 
 A scope is a storage location code (`CON-S01`) or a pooled group code
 (`FG-POOL`). Projecting a scope with no daily plan returns 404.
@@ -293,6 +353,10 @@ five pre-posting checks and projection. Three assert against real season
 figures: the finished goods pool overflowing on 28 May 2027, the requirement
 document's tank example, and the shared-warehouse rule.
 
+A further 30 unit tests cover the master data validation rules — package weight
+derivation, the alert band cover, and every rejection path on storage
+locations, capacity rows and plan lines.
+
 Integration tests are build-tagged so the default run stays hermetic:
 
 ```bash
@@ -301,11 +365,13 @@ SPP_TEST_DATABASE_URL="postgres://localhost/spp_test" \
   go test -tags=integration -count=1 ./...
 ```
 
-They cover what the unit tests cannot: the SQL, migration idempotency, the
-seeded season still reconciling with the summary report, every plan line
-balancing, the capacity rules against real master data, and balances following
-posted movements. They create the schema themselves and clean up after
-themselves, so they can run repeatedly against the same database.
+Twelve tests covering what the unit tests cannot: the SQL, migration
+idempotency, the seeded season still reconciling with the summary report, every
+plan line balancing, the capacity rules against real master data, balances
+following posted movements, the master data round trip, optimistic locking
+under a concurrent edit, reservations bounding available stock, and plan
+openings carrying forward. They create the schema themselves and reverse every
+change they make, so they can run repeatedly against the same database.
 
 ## CI
 

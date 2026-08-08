@@ -56,6 +56,10 @@ var ErrValidation = errors.New("invalid request")
 // cannot be projected.
 var ErrNotFound = errors.New("not found")
 
+// ErrConflict means the caller's view of a record is stale — somebody else
+// changed it first.
+var ErrConflict = errors.New("conflict")
+
 // ValidateMovement runs the pre-posting capacity checks without writing
 // anything (requirement section 24).
 func (s *Service) ValidateMovement(ctx context.Context, req MovementRequest) (MovementResponse, error) {

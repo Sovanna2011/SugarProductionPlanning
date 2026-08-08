@@ -13,6 +13,7 @@ package postgres_test
 
 import (
 	"context"
+	"errors"
 	"os"
 	"testing"
 	"time"
@@ -445,3 +446,270 @@ func TestDashboardBuilds(t *testing.T) {
 }
 
 func f(v float64) *float64 { return &v }
+
+// --- master data maintenance ------------------------------------------------
+
+// TestMasterDataRoundTrip creates a warehouse and its capacity through the
+// service, then checks the read path sees them. This is the requirement's
+// "all values must be configurable through Master Data" as an executable
+// statement: nothing here touches SQL directly.
+func TestMasterDataRoundTrip(t *testing.T) {
+	store, ctx := open(t)
+	svc := service.New(store)
+
+	factories, err := store.ListFactories(ctx)
+	if err != nil || len(factories) == 0 {
+		t.Fatalf("no factory seeded: %v", err)
+	}
+	factoryID := factories[0].ID
+	const code = "IT-WH01"
+
+	created, err := svc.SaveStorageLocation(ctx, service.StorageLocationInput{
+		FactoryID:              factoryID,
+		StorageCode:            code,
+		StorageName:            "Integration Test Warehouse",
+		StorageTypeCode:        "FINISHED_GOODS_WAREHOUSE",
+		PhysicalCapacity:       12_000,
+		SafeCapacityPercentage: 90,
+		AllowMixedProducts:     true,
+		UpdatedBy:              "integration-test",
+	})
+	if err != nil {
+		t.Fatalf("create location: %v", err)
+	}
+	if !created.Created {
+		t.Error("expected the result to report a creation")
+	}
+	t.Cleanup(func() {
+		_, _ = store.Pool().Exec(context.Background(),
+			`DELETE FROM storage_product_capacity WHERE storage_location_id =
+			  (SELECT id FROM storage_locations WHERE storage_code = $1)`, code)
+		_, _ = store.Pool().Exec(context.Background(),
+			`DELETE FROM storage_locations WHERE storage_code = $1`, code)
+	})
+
+	got, err := store.GetStorageLocation(ctx, factoryID, code)
+	if err != nil {
+		t.Fatalf("read back: %v", err)
+	}
+	if got.PhysicalCapacity != 12_000 || got.SafeCapacityPercentage != 90 {
+		t.Errorf("stored %v t at %v%%, want 12,000 at 90", got.PhysicalCapacity, got.SafeCapacityPercentage)
+	}
+
+	// Configure a product ceiling and confirm the capacity matrix sees it.
+	if _, err := svc.SaveStorageProductCapacity(ctx, service.StorageProductCapacityInput{
+		StorageCode:       code,
+		ProductCode:       "WHITE-SUGAR",
+		PackagingCode:     "PKG-50KG",
+		MaximumPackageQty: ptrFloat(100_000),
+		MaximumWeightQty:  ptrFloat(5_000),
+		UpdatedBy:         "integration-test",
+	}); err != nil {
+		t.Fatalf("create capacity: %v", err)
+	}
+
+	caps, err := store.ListStorageProductCapacity(ctx, postgres.CapacityFilter{StorageCode: code})
+	if err != nil {
+		t.Fatalf("list capacity: %v", err)
+	}
+	if len(caps) != 1 {
+		t.Fatalf("capacity rows = %d, want 1", len(caps))
+	}
+	if caps[0].MaximumWeightQty == nil || *caps[0].MaximumWeightQty != 5_000 {
+		t.Errorf("stored weight ceiling = %v, want 5,000", caps[0].MaximumWeightQty)
+	}
+}
+
+// TestOptimisticLockingRejectsAStaleUpdate proves two editors cannot silently
+// overwrite each other.
+func TestOptimisticLockingRejectsAStaleUpdate(t *testing.T) {
+	store, ctx := open(t)
+	svc := service.New(store)
+
+	factories, err := store.ListFactories(ctx)
+	if err != nil || len(factories) == 0 {
+		t.Fatalf("no factory seeded: %v", err)
+	}
+	factoryID := factories[0].ID
+	const code = "IT-WH02"
+
+	input := func(capacity float64, version *int) service.StorageLocationInput {
+		return service.StorageLocationInput{
+			FactoryID: factoryID, StorageCode: code, StorageName: "Locking Test",
+			StorageTypeCode:  "FINISHED_GOODS_WAREHOUSE",
+			PhysicalCapacity: capacity, SafeCapacityPercentage: 95,
+			Version: version, UpdatedBy: "integration-test",
+		}
+	}
+
+	if _, err := svc.SaveStorageLocation(ctx, input(1_000, nil)); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = store.Pool().Exec(context.Background(),
+			`DELETE FROM storage_locations WHERE storage_code = $1`, code)
+	})
+
+	v1 := 1
+	if _, err := svc.SaveStorageLocation(ctx, input(2_000, &v1)); err != nil {
+		t.Fatalf("first update at version 1: %v", err)
+	}
+
+	// A second editor still holding version 1 must be refused.
+	_, err = svc.SaveStorageLocation(ctx, input(3_000, &v1))
+	if err == nil {
+		t.Fatal("a stale version must not overwrite a newer record")
+	}
+	if !errors.Is(err, service.ErrConflict) {
+		t.Errorf("error should wrap ErrConflict, got %v", err)
+	}
+
+	got, err := store.GetStorageLocation(ctx, factoryID, code)
+	if err != nil {
+		t.Fatalf("read back: %v", err)
+	}
+	if got.PhysicalCapacity != 2_000 {
+		t.Errorf("capacity = %v, want the first update's 2,000 to have survived", got.PhysicalCapacity)
+	}
+}
+
+// TestReservationsBoundAvailableStock covers requirement section 9: reserved
+// stock stays on hand but stops being available to commit again.
+func TestReservationsBoundAvailableStock(t *testing.T) {
+	store, ctx := open(t)
+	svc := service.New(store)
+
+	factories, err := store.ListFactories(ctx)
+	if err != nil || len(factories) == 0 {
+		t.Fatalf("no factory seeded: %v", err)
+	}
+	factoryID := factories[0].ID
+	const batch = "IT-RESERVE-01"
+
+	move := func(movementType string, packages float64) {
+		t.Helper()
+		res, err := svc.PostMovement(ctx, service.MovementRequest{
+			FactoryID: factoryID, MovementType: movementType,
+			StorageCode: "FG-WH01", ProductCode: "REFINED-SUGAR", PackagingCode: "PKG-50KG",
+			BatchNo: batch, PackageQuantity: ptrFloat(packages), PostedBy: "integration-test",
+		})
+		if err != nil || !res.Posted {
+			t.Fatalf("%s: %v %+v", movementType, err, res.Validation.Findings)
+		}
+	}
+	reserve := func(weight float64) (service.ReservationResult, error) {
+		return svc.Reserve(ctx, service.ReservationRequest{
+			FactoryID: factoryID, StorageCode: "FG-WH01",
+			ProductCode: "REFINED-SUGAR", PackagingCode: "PKG-50KG",
+			BatchNo: batch, WeightQuantity: ptrFloat(weight), UpdatedBy: "integration-test",
+		})
+	}
+
+	move("PACKING_RECEIPT", 20_000) // 1,000 t
+	t.Cleanup(func() {
+		// Release then issue back out, so the database is left as found.
+		_, _ = svc.Release(context.Background(), service.ReservationRequest{
+			FactoryID: factoryID, StorageCode: "FG-WH01",
+			ProductCode: "REFINED-SUGAR", PackagingCode: "PKG-50KG",
+			BatchNo: batch, WeightQuantity: ptrFloat(600),
+		})
+		move("SALES_ISSUE", 20_000)
+	})
+
+	res, err := reserve(600)
+	if err != nil {
+		t.Fatalf("reserve 600 t of 1,000 t: %v", err)
+	}
+	if res.OnHand.Weight != 1_000 {
+		t.Errorf("on hand = %v, want reserving not to move stock", res.OnHand.Weight)
+	}
+	if res.Available.Weight != 400 {
+		t.Errorf("available = %v t, want 400", res.Available.Weight)
+	}
+
+	// Committing beyond what is left must be refused.
+	if _, err := reserve(500); err == nil {
+		t.Fatal("reserving more than is available must fail")
+	} else if !errors.Is(err, service.ErrValidation) {
+		t.Errorf("error should wrap ErrValidation, got %v", err)
+	}
+
+	// Releasing more than is reserved must also be refused.
+	if _, err := svc.Release(ctx, service.ReservationRequest{
+		FactoryID: factoryID, StorageCode: "FG-WH01",
+		ProductCode: "REFINED-SUGAR", PackagingCode: "PKG-50KG",
+		BatchNo: batch, WeightQuantity: ptrFloat(5_000),
+	}); err == nil {
+		t.Fatal("releasing more than is reserved must fail")
+	}
+}
+
+// TestStoragePlanCarriesOpeningForward checks a planner can enter a run of
+// days supplying only the movements (requirement section 15).
+func TestStoragePlanCarriesOpeningForward(t *testing.T) {
+	store, ctx := open(t)
+	svc := service.New(store)
+
+	factories, err := store.ListFactories(ctx)
+	if err != nil || len(factories) == 0 {
+		t.Fatalf("no factory seeded: %v", err)
+	}
+	factoryID := factories[0].ID
+
+	// A window well clear of the seeded season so the test is self-contained.
+	day1 := date(2028, time.June, 1)
+	t.Cleanup(func() {
+		_, _ = store.Pool().Exec(context.Background(),
+			`DELETE FROM daily_storage_plans WHERE plan_date >= $1`, day1)
+	})
+
+	results, err := svc.SaveStoragePlan(ctx, []service.StoragePlanLineInput{
+		{FactoryID: factoryID, PlanDate: day1, ScopeCode: "CON-S01",
+			OpeningWeight: ptrFloat(500), PlannedInWeight: 400, PlannedOutWeight: 300,
+			UpdatedBy: "integration-test"},
+		{FactoryID: factoryID, PlanDate: day1.AddDate(0, 0, 1), ScopeCode: "CON-S01",
+			PlannedInWeight: 400, PlannedOutWeight: 300, UpdatedBy: "integration-test"},
+		{FactoryID: factoryID, PlanDate: day1.AddDate(0, 0, 2), ScopeCode: "CON-S01",
+			PlannedInWeight: 400, PlannedOutWeight: 300, UpdatedBy: "integration-test"},
+	})
+	if err != nil {
+		t.Fatalf("save plan: %v", err)
+	}
+	if len(results) != 3 {
+		t.Fatalf("saved %d lines, want 3", len(results))
+	}
+
+	// 500 -> 600 -> 700 -> 800, each day opening where the last one closed.
+	want := []float64{600, 700, 800}
+	for i, r := range results {
+		if r.PlannedClosing != want[i] {
+			t.Errorf("day %d closing = %v, want %v", i+1, r.PlannedClosing, want[i])
+		}
+	}
+	if results[1].OpeningWeight != 600 {
+		t.Errorf("day 2 opening = %v, want day 1's closing of 600", results[1].OpeningWeight)
+	}
+
+	// Saving the same day again must replace, not duplicate.
+	if _, err := svc.SaveStoragePlan(ctx, []service.StoragePlanLineInput{
+		{FactoryID: factoryID, PlanDate: day1, ScopeCode: "CON-S01",
+			OpeningWeight: ptrFloat(500), PlannedInWeight: 100, PlannedOutWeight: 0,
+			UpdatedBy: "integration-test"},
+	}); err != nil {
+		t.Fatalf("re-save: %v", err)
+	}
+	lines, err := store.ListDailyStoragePlans(ctx, postgres.StoragePlanFilter{
+		FactoryID: factoryID, ScopeCode: "CON-S01", From: day1, To: day1,
+	})
+	if err != nil {
+		t.Fatalf("read back: %v", err)
+	}
+	if len(lines) != 1 {
+		t.Fatalf("plan lines for the day = %d, want 1 (replaced, not duplicated)", len(lines))
+	}
+	if lines[0].PlannedClosingWeight != 600 {
+		t.Errorf("closing after re-save = %v, want 600", lines[0].PlannedClosingWeight)
+	}
+}
+
+func ptrFloat(v float64) *float64 { return &v }

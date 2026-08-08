@@ -8,22 +8,22 @@ to where it is implemented.
 |---|---|---|
 | 1 | Storage structure | `0005_seed_master_data.sql` — 3 tanks, 2 raw warehouses, 1 conditioning silo, 3 finished warehouses |
 | 2 | Storage location types | `storage_types` table + seed |
-| 3 | Storage location master | `storage_locations` — all listed fields including safe %, mixed products/batches, effective dates, remark |
-| 4 | Product-specific storage capacity | `storage_product_capacity` keyed by location + product + packaging |
-| 5 | Packaging master | `packaging_types`; six sizes seeded, extensible by `INSERT`. No package size appears in Go |
+| 3 | Storage location master | `storage_locations` — all listed fields including safe %, mixed products/batches, effective dates, remark. Maintained via `POST /master/storage-locations` |
+| 4 | Product-specific storage capacity | `storage_product_capacity` keyed by location + product + packaging. Maintained via `POST /master/storage-capacities` |
+| 5 | Packaging master | `packaging_types`; six sizes seeded, extensible via `POST /master/packaging-types`. No package size appears in Go, and the ton conversion is derived from the net weight rather than trusted |
 | 6 | Product + packaging combination | `product_packaging`; inventory keyed by product + packaging + batch + location |
 | 7 | Molasses tank capacity | Tank rows + `capacity.Utilize`; available and utilisation formulas covered by `TestUtilizeMatchesTheTankExample` |
 | 8 | Raw sugar warehouse capacity | `RAW-WH01/02` with bulk and jumbo capacity rows |
-| 9 | Raw sugar → remelt availability | `inventory_available` view, `GET /inventory/balances`; issue blocked when stock is short |
+| 9 | Raw sugar → remelt availability | `inventory_available` view, `GET /inventory/balances`; `POST /inventory/reservations` commits stock and bounds what is available; issue blocked when stock is short |
 | 10 | Conditioning Silo 1 | `CON-S01`, storage type `tracks_packages = false`, weight-managed |
 | 11 | Finished sugar warehouses | `FG-WH01/02/03`; new products need only a new capacity row |
-| 12 | Finished warehouse product capacity | Seeded capacity matrix, all values master data |
+| 12 | Finished warehouse product capacity | Seeded capacity matrix, all values maintainable through the API |
 | 13 | Shared warehouse capacity | `capacity.Validate` checks the product ceiling **and** the location total; `TestValidateBlocksOnPhysicalCapacityEvenWhenTheProductFits` |
 | 14 | Package/weight conversion | `capacity.WeightOf` / `PackagesOf`; the API derives whichever axis the caller omits |
-| 15 | Daily warehouse planning | `daily_storage_plans`; `GET /planning/storage` |
+| 15 | Daily warehouse planning | `daily_storage_plans`; `GET`/`POST /planning/storage`. Closing stock is derived, and an omitted opening carries the previous day's closing forward |
 | 16 | Daily warehouse actual | Balances only change via posted movements, in the same transaction. No API writes a closing stock |
 | 17 | Plan vs actual | `GET /planning/plan-vs-actual` — opening, planned/actual in and out, closing, variance, capacity, available, utilisation |
-| 18 | Capacity alerts | `capacity_threshold_levels` (configurable bands) + `capacity.Classify`; `GET /alerts` |
+| 18 | Capacity alerts | `capacity_threshold_levels` + `capacity.Classify`; `GET /alerts`. Bands are replaced as a validated contiguous set via `PUT /master/threshold-levels` |
 | 19 | Future capacity planning | `GET /planning/projection` — daily curve, first safe and physical breach dates, horizons today/+1/+3/+7/end of month/end of season |
 | 20 | Warehouse dashboard | `webapp/` UI5 app — all six filters, pooled cards, per-location utilisation bars, product tables, alerts |
 | 21 | PostgreSQL storage master design | `backend/migrations/0001`–`0004`; all listed tables plus audit and version columns |
@@ -32,6 +32,7 @@ to where it is implemented.
 | 24 | Capacity validation | `capacity.Validate` — physical, product, package, safe, plus product-allowed and mixed-products. Blocking findings need an authorised override with a reason |
 | 25 | Updated storage process | Modelled by storage types, groups and movement types |
 | 26 | Final storage requirement | The dashboard reports physical, product and package capacity, current, reserved, available stock, available capacity, utilisation and projected capacity |
+| — | "All values must be configurable" (§§3, 4, 5, 12, 18, 22, 26) | Master data is maintained through the API with validation and optimistic locking, not by editing SQL |
 
 ## Deviations and additions
 

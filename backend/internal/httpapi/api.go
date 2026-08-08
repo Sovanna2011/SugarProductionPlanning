@@ -4,6 +4,7 @@ package httpapi
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -45,16 +46,26 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("GET /api/v1/master/threshold-levels", a.thresholdLevels)
 	mux.HandleFunc("GET /api/v1/master/movement-types", a.movementTypes)
 
+	// Master data maintenance. Everything the requirement calls configurable
+	// is maintained here rather than by editing SQL.
+	mux.HandleFunc("POST /api/v1/master/storage-locations", a.saveStorageLocation)
+	mux.HandleFunc("POST /api/v1/master/storage-capacities", a.saveStorageCapacity)
+	mux.HandleFunc("POST /api/v1/master/packaging-types", a.savePackagingType)
+	mux.HandleFunc("PUT /api/v1/master/threshold-levels", a.replaceThresholds)
+
 	// Inventory.
 	mux.HandleFunc("GET /api/v1/inventory/balances", a.balances)
 	mux.HandleFunc("GET /api/v1/inventory/movements", a.movements)
 	mux.HandleFunc("POST /api/v1/inventory/movements", a.postMovement)
 	mux.HandleFunc("POST /api/v1/inventory/movements/validate", a.validateMovement)
+	mux.HandleFunc("POST /api/v1/inventory/reservations", a.reserve)
+	mux.HandleFunc("POST /api/v1/inventory/reservations/release", a.release)
 
 	// Planning and dashboard.
 	mux.HandleFunc("GET /api/v1/seasons", a.seasons)
 	mux.HandleFunc("GET /api/v1/planning/production", a.productionPlan)
 	mux.HandleFunc("GET /api/v1/planning/storage", a.storagePlan)
+	mux.HandleFunc("POST /api/v1/planning/storage", a.saveStoragePlan)
 	mux.HandleFunc("GET /api/v1/planning/projection", a.projection)
 	mux.HandleFunc("GET /api/v1/planning/plan-vs-actual", a.planVsActual)
 	mux.HandleFunc("GET /api/v1/dashboard/storage-capacity", a.dashboard)
@@ -97,6 +108,8 @@ func (a *API) handle(w http.ResponseWriter, r *http.Request, fn func() (any, err
 			status = http.StatusBadRequest
 		case errors.Is(err, service.ErrNotFound):
 			status = http.StatusNotFound
+		case errors.Is(err, service.ErrConflict):
+			status = http.StatusConflict
 		}
 		a.fail(w, r, status, err)
 		return
@@ -258,13 +271,105 @@ func (a *API) validateMovement(w http.ResponseWriter, r *http.Request) {
 }
 
 func decodeMovement(r *http.Request) (service.MovementRequest, error) {
-	var req service.MovementRequest
-	dec := json.NewDecoder(http.MaxBytesReader(nil, r.Body, 1<<20))
+	return decodeBody[service.MovementRequest](r)
+}
+
+// decodeBody reads a JSON request body, rejecting unknown fields so a
+// misspelled key is reported rather than silently ignored.
+func decodeBody[T any](r *http.Request) (T, error) {
+	var body T
+	dec := json.NewDecoder(http.MaxBytesReader(nil, r.Body, 4<<20))
 	dec.DisallowUnknownFields()
-	if err := dec.Decode(&req); err != nil {
-		return req, errors.Join(service.ErrValidation, err)
+	if err := dec.Decode(&body); err != nil {
+		return body, errors.Join(service.ErrValidation, err)
 	}
-	return req, nil
+	return body, nil
+}
+
+// --- master data maintenance ------------------------------------------------
+
+func (a *API) saveStorageLocation(w http.ResponseWriter, r *http.Request) {
+	a.handle(w, r, func() (any, error) {
+		in, err := decodeBody[service.StorageLocationInput](r)
+		if err != nil {
+			return nil, err
+		}
+		return a.svc.SaveStorageLocation(r.Context(), in)
+	})
+}
+
+func (a *API) saveStorageCapacity(w http.ResponseWriter, r *http.Request) {
+	a.handle(w, r, func() (any, error) {
+		in, err := decodeBody[service.StorageProductCapacityInput](r)
+		if err != nil {
+			return nil, err
+		}
+		return a.svc.SaveStorageProductCapacity(r.Context(), in)
+	})
+}
+
+func (a *API) savePackagingType(w http.ResponseWriter, r *http.Request) {
+	a.handle(w, r, func() (any, error) {
+		in, err := decodeBody[service.PackagingTypeInput](r)
+		if err != nil {
+			return nil, err
+		}
+		return a.svc.SavePackagingType(r.Context(), in)
+	})
+}
+
+func (a *API) replaceThresholds(w http.ResponseWriter, r *http.Request) {
+	a.handle(w, r, func() (any, error) {
+		in, err := decodeBody[service.ThresholdBandsInput](r)
+		if err != nil {
+			return nil, err
+		}
+		return a.svc.ReplaceThresholdBands(r.Context(), in)
+	})
+}
+
+// --- reservations -----------------------------------------------------------
+
+func (a *API) reserve(w http.ResponseWriter, r *http.Request) {
+	a.handle(w, r, func() (any, error) {
+		in, err := decodeBody[service.ReservationRequest](r)
+		if err != nil {
+			return nil, err
+		}
+		return a.svc.Reserve(r.Context(), in)
+	})
+}
+
+func (a *API) release(w http.ResponseWriter, r *http.Request) {
+	a.handle(w, r, func() (any, error) {
+		in, err := decodeBody[service.ReservationRequest](r)
+		if err != nil {
+			return nil, err
+		}
+		return a.svc.Release(r.Context(), in)
+	})
+}
+
+// --- daily storage plan -----------------------------------------------------
+
+// saveStoragePlan accepts either a single plan line or an array of them.
+func (a *API) saveStoragePlan(w http.ResponseWriter, r *http.Request) {
+	a.handle(w, r, func() (any, error) {
+		raw, err := io.ReadAll(http.MaxBytesReader(nil, r.Body, 4<<20))
+		if err != nil {
+			return nil, errors.Join(service.ErrValidation, err)
+		}
+
+		var lines []service.StoragePlanLineInput
+		if err := json.Unmarshal(raw, &lines); err != nil {
+			var single service.StoragePlanLineInput
+			if err2 := json.Unmarshal(raw, &single); err2 != nil {
+				return nil, errors.Join(service.ErrValidation, err2)
+			}
+			lines = []service.StoragePlanLineInput{single}
+		}
+		return a.svc.SaveStoragePlan(r.Context(), lines)
+	})
 }
 
 func (a *API) seasons(w http.ResponseWriter, r *http.Request) {
