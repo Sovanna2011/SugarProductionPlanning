@@ -4,6 +4,7 @@ package httpapi
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net"
@@ -70,6 +71,10 @@ func (a *API) Routes() http.Handler {
 	// because a browser has to ask both before anyone has one.
 	mux.HandleFunc("GET /api/v1/auth/config", a.authConfigHandler)
 	mux.HandleFunc("GET /api/v1/system/config", a.systemConfig)
+
+	// The central audit log: who changed what, from what to what.
+	mux.HandleFunc("GET /api/v1/audit/log", a.auditLog)
+	mux.HandleFunc("GET /api/v1/audit/exclusions", a.auditLogExclusions)
 	mux.HandleFunc("POST /api/v1/auth/login", a.login)
 	mux.HandleFunc("POST /api/v1/auth/logout", a.logout)
 	mux.HandleFunc("GET /api/v1/auth/me", a.me)
@@ -530,4 +535,50 @@ func (a *API) alerts(w http.ResponseWriter, r *http.Request) {
 // point of the endpoint is that the browser stops being the authority.
 func (a *API) systemConfig(w http.ResponseWriter, r *http.Request) {
 	a.handle(w, r, func() (any, error) { return a.svc.SystemConfig(r.Context()) })
+}
+
+// auditLog serves recorded changes, newest first.
+//
+// Filters map to the three questions the log gets asked: what happened lately
+// (none), what happened to this record (table + recordId or recordKey), and
+// what has this person been doing (actedBy). Each has an index behind it, so
+// none of them degrades into a scan of a table that only ever grows.
+func (a *API) auditLog(w http.ResponseWriter, r *http.Request) {
+	a.handle(w, r, func() (any, error) {
+		q := r.URL.Query()
+		f := postgres.AuditLogFilter{
+			TableName: q.Get("table"),
+			RecordKey: q.Get("recordKey"),
+			Field:     q.Get("field"),
+			RecordID:  intParam(r, "recordId"),
+			ActedBy:   intParam(r, "actedBy"),
+			Limit:     int(intParam(r, "limit")),
+		}
+		if v := q.Get("from"); v != "" {
+			t, err := time.Parse(time.RFC3339, v)
+			if err != nil {
+				return nil, fmt.Errorf("%w: from must be an RFC 3339 timestamp, got %q",
+					service.ErrValidation, v)
+			}
+			f.From = &t
+		}
+		if v := q.Get("to"); v != "" {
+			t, err := time.Parse(time.RFC3339, v)
+			if err != nil {
+				return nil, fmt.Errorf("%w: to must be an RFC 3339 timestamp, got %q",
+					service.ErrValidation, v)
+			}
+			f.To = &t
+		}
+		return a.svc.Store().ListAuditLog(r.Context(), f)
+	})
+}
+
+// auditLogExclusions serves the tables the log does not cover, with the reason
+// each one is out. Somebody reading history and finding nothing about a table
+// needs to know whether nothing happened or nothing was recorded.
+func (a *API) auditLogExclusions(w http.ResponseWriter, r *http.Request) {
+	a.handle(w, r, func() (any, error) {
+		return a.svc.Store().ListAuditLogExclusions(r.Context())
+	})
 }

@@ -558,12 +558,20 @@ own timezone (`Asia/Phnom_Penh`, configured in `system_parameters`) so that a
 posting belongs to the day it happened on at the site rather than in the
 reader's browser.
 
-Three tests hold the line: a static scan of the migrations that needs no
+Those four fields say *who* changed a record. `audit_logs` says *what*: one row
+per create, change or delete, with every field that moved and its old and new
+value, written by a trigger so an `UPDATE` typed by hand is recorded too.
+Passwords are logged as having changed, never as what they changed to. A save
+that touched nothing writes nothing. Reading history needs the ADMIN role — not
+because the entries are secret, but because read together they describe the
+staff rather than the sugar.
+
+Four tests hold the line: a static scan of the migrations that needs no
 database and fails the pull request that adds a non-compliant table, an
-integration test that asks the live schema what it actually has, and one that
-exercises the guarantees rather than inspecting them. Full detail, including
-what these fields are *not* — they say who changed a record, not what changed —
-is in [docs/audit-fields.md](docs/audit-fields.md).
+integration test that asks the live schema what it actually has, one that
+exercises the guarantees rather than inspecting them, and one that changes
+things the ordinary way and asks the log what it saw. Full detail is in
+[docs/audit-fields.md](docs/audit-fields.md).
 
 ## Tests
 

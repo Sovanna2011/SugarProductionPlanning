@@ -89,8 +89,26 @@ worth knowing about before reading the migration:
 Full detail, including the mapping from the requirement's table names onto the
 ones this system actually has, is in [`audit-fields.md`](audit-fields.md).
 
-**The central audit log is specified but not built.** The four fields answer
-who changed a record and when; they do not answer what changed from what to
-what. That is a separate table and a separate piece of work, and calling it
-done because the four fields exist would be the sort of half-truth this
-document is meant to avoid.
+**The central audit log** (requirement section 10). `audit_logs` records one
+row per create, change or delete: which table, which record, which action, and
+each field that moved with its old and new value. A trigger writes it, for the
+same reason as the four fields and with more force — a log the application
+maintains records exactly the writes the application remembered to record,
+which is the set least likely to need auditing.
+
+Four decisions in it are worth stating, because each one is a judgement rather
+than a mechanical consequence of the requirement:
+
+- **Secrets are recorded as having changed, never as what they changed to.**
+  Hashing a password in `app_users` achieves nothing if the hash is copied into
+  a table that gets exported to settle a capacity dispute.
+- **A save that changed nothing writes nothing.** An entry saying a record was
+  changed that cannot say how is worse than silence.
+- **Three tables are excluded, and the reason is a `NOT NULL` column** on
+  `audit_log_exclusions` rather than a comment, served by the API alongside the
+  log. Somebody reading history and finding nothing needs to know whether
+  nothing happened or nothing was recorded.
+- **Reading it needs ADMIN.** Not because the entries are secret, but because
+  read together they say when each person works, how fast, and what they get
+  wrong — a picture of the staff rather than of the sugar. Anybody can still
+  see their own actions on the record they changed.

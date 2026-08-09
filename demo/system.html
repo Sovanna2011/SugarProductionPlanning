@@ -894,6 +894,12 @@ const RULES = {
   editPlan: ["ADMIN", "PLANNER"],
   postMovements: ["ADMIN", "WAREHOUSE"],
   administerUsers: ["ADMIN"],
+  // Not because the entries are secret — each is a change somebody made to
+  // shared operational data. Because of what they accumulate: read together
+  // they say when each person works, how fast, and what they get wrong. That
+  // is a picture of the staff rather than of the sugar. Anybody can still see
+  // their own actions on the record they changed.
+  readAuditLog: ["ADMIN"],
 };
 
 const DEMO_ACCOUNTS = [
@@ -1430,6 +1436,11 @@ function reverseMovement(id, reason) {
   db.movements.push(reversal);
   original.reversedBy = reversal.id;
   auditChange(original);
+  logChange("inventory_movements", "#" + reversal.id, "CREATE", {
+    reverses: { old: null, new: "#" + original.id },
+    weight_quantity: { old: null, new: round(reversal.weight, 3) },
+    reason: { old: null, new: reason },
+  });
   save();
   return reversal;
 }
@@ -1464,6 +1475,13 @@ function postMovement(req) {
   });
   out.posted = true;
   out.movementId = id;
+  logChange("inventory_movements", "#" + id, "CREATE", {
+    movement_type: { old: null, new: mt.name },
+    storage_location: { old: null, new: loc.code },
+    product: { old: null, new: product.code },
+    weight_quantity: { old: null, new: round(sign * out.quantity.weight, 3) },
+    movement_date: { old: null, new: req.date || todayIso() },
+  });
   save();
   return out;
 }
@@ -1619,6 +1637,7 @@ const PAGES = [
   { id: "actual", label: "Actual against plan", needs: null },
   { id: "ledger", label: "Movement history", needs: null },
   { id: "plan", label: "Daily production plan", needs: null },
+  { id: "audit", label: "Audit log", needs: "readAuditLog" },
   { id: "users", label: "Users", needs: "administerUsers" },
 ];
 
@@ -1866,6 +1885,9 @@ function editLocation(code) {
     ${adminInfoHtml(l)}`,
     () => {
       requirePermission("editMasterData");
+      // Snapshot before, diff after: the same shape the database trigger uses,
+      // so the entries read the same as the real system's.
+      const before = { ...l };
       const cap = Number(document.getElementById("f-cap").value);
       const safe = Number(document.getElementById("f-safe").value);
       if (!(cap >= 0)) throw new Error("capacity must be a number of tons, zero or more");
@@ -1878,6 +1900,7 @@ function editLocation(code) {
       l.remark = document.getElementById("f-remark").value.trim();
       l.version++;
       auditChange(l);
+      logChange("storage_locations", l.code, "CHANGE", diffFields(before, l));
       save();
       route();
       toast(`${l.code} saved.`);
@@ -2658,6 +2681,10 @@ function editPlanDay(date) {
         values[c.key] = v;
       }
       const before = findings();
+      const planBefore = {};
+      for (const c of PLAN_COLUMNS) planBefore[c.key] = r[c.i];
+      planBefore.cleaningDay = !!r[11];
+      planBefore.note = r[12];
       for (const c of PLAN_COLUMNS) r[c.i] = values[c.key];
       r[11] = document.getElementById("pd-clean").checked ? 1 : 0;
       r[12] = document.getElementById("pd-note").value.trim();
@@ -2669,6 +2696,8 @@ function editPlanDay(date) {
       db.planAudit = db.planAudit || {};
       db.planAudit[date] = db.planAudit[date]
         ? auditChange(db.planAudit[date]) : auditCreate();
+      const planAfter = { ...values, cleaningDay: !!r[11], note: r[12] };
+      logChange("daily_production_plans", date, "CHANGE", diffFields(planBefore, planAfter));
       db.storagePlan = recomputeStoragePlan(db.plan);
       const after = findings();
 
@@ -2685,6 +2714,161 @@ function editPlanDay(date) {
       }).filter(Boolean);
       toast(moved.length ? moved.join(" · ") : `${human(date)} saved.`);
     });
+}
+
+
+/* =========================================================================
+   The central audit log.
+
+   The four fields on every record say who last changed it and when. This says
+   what changed, from what, to what — the difference between "ADMIN changed
+   this warehouse on 9 August" and "ADMIN changed its capacity from 22,000 t to
+   23,500 t", which is the half that settles an argument.
+
+   In the real system a database trigger writes it, so a change made outside
+   the application is recorded too. Here there is no database, so the entries
+   come from the same functions that make the changes — which is the one thing
+   this page cannot faithfully reproduce, and it says so on screen rather than
+   letting somebody assume otherwise.
+   ====================================================================== */
+
+/** Record one change. Called by whatever made it, never by a form. */
+function logChange(table, recordKey, action, changes) {
+  const who = auditActor();
+  db.auditLog = db.auditLog || [];
+  const fields = Object.keys(changes || {});
+  // A save that moved nothing is not a change. An entry saying a record
+  // changed that cannot say how is worse than silence.
+  if (action === "CHANGE" && fields.length === 0) return;
+  db.auditLog.push({
+    id: (db.auditSeq = (db.auditSeq || 0) + 1),
+    table, recordKey, action,
+    changes: changes || {},
+    changedFields: fields,
+    actedBy: who.id, actedByName: who.name,
+    actedAt: new Date().toISOString(),
+  });
+}
+
+/**
+ * The names the real system's log uses.
+ *
+ * This page holds a storage location as a JavaScript object with camelCase
+ * keys; the database holds a row with snake_case columns, and the log records
+ * the column. Somebody comparing the two should see the same word in both, so
+ * the demo speaks the schema's language rather than its own.
+ */
+const COLUMN_NAMES = {
+  name: "storage_name", physicalCapacity: "physical_capacity",
+  safePct: "safe_capacity_percentage", allowMixed: "allow_mixed_products",
+  status: "status", remark: "remark", code: "storage_code",
+  cane: "cane_crushed", raw: "raw_sugar_target", remelt: "remelt_target",
+  packing: "raw_packing", refined: "refined_packed", white: "white_packed",
+  superRefined: "super_refined_packed", quota: "quota_sales",
+  cleaningDay: "cleaning_day", note: "remark",
+};
+
+/** The fields that differ, old and new, ignoring the audit columns themselves. */
+function diffFields(before, after) {
+  const skip = new Set(["createdBy", "createdByName", "createdAt",
+                        "changedBy", "changedByName", "changedAt", "version"]);
+  const out = {};
+  for (const key of new Set([...Object.keys(before || {}), ...Object.keys(after || {})])) {
+    if (skip.has(key)) continue;
+    const o = before ? before[key] : undefined;
+    const n = after ? after[key] : undefined;
+    if (JSON.stringify(o) !== JSON.stringify(n)) {
+      out[COLUMN_NAMES[key] || key] = {
+        old: o === undefined ? null : o, new: n === undefined ? null : n };
+    }
+  }
+  return out;
+}
+
+const AUDIT_ACTIONS = { CREATE: "NORMAL", CHANGE: "WARNING", DELETE: "HIGH" };
+
+function renderAudit() {
+  const all = (db.auditLog || []).slice().reverse();
+
+  const table = renderAudit.table || "";
+  const actor = renderAudit.actor || "";
+  const entries = all.filter(e =>
+    (!table || e.table === table) && (!actor || e.actedBy === actor));
+
+  const tables = [...new Set(all.map(e => e.table))].sort();
+  const actors = [...new Set(all.map(e => e.actedBy))].sort();
+
+  const valueText = v => {
+    if (v === null || v === undefined) return "—";
+    if (typeof v === "boolean") return v ? "yes" : "no";
+    if (typeof v === "number") return num(v);
+    if (Array.isArray(v)) return v.join(", ") || "—";
+    return String(v) || "(empty)";
+  };
+
+  view.innerHTML = head("Audit log",
+    `Who changed what, on which record, from what value to what value. One entry per
+     change, and only the fields that actually moved &mdash; a saved form that touched
+     nothing writes nothing.
+     <b>In the real system a database trigger writes this</b>, so an <code>UPDATE</code>
+     typed by hand at three in the morning is recorded too. On this page there is no
+     database, so the entries come from the code that made the changes; that is the one
+     part of it a page without a server cannot reproduce.`)
+    + `<div class="toolbar">
+        <label class="field"><span>Table</span><select id="au-table">
+          <option value="">All tables</option>
+          ${tables.map(t => `<option value="${esc(t)}"${t === table ? " selected" : ""}>${esc(t)}</option>`).join("")}
+        </select></label>
+        <label class="field"><span>Who</span><select id="au-actor">
+          <option value="">Anybody</option>
+          ${actors.map(a => `<option value="${esc(a)}"${a === actor ? " selected" : ""}>${esc(a)}</option>`).join("")}
+        </select></label>
+        <span class="spacer"></span>
+        <span class="note">${entries.length} of ${all.length} entries</span>
+      </div>
+
+      <div class="tablewrap"><table>
+        <thead><tr><th>When</th><th>Who</th><th>Action</th><th>Record</th><th>What changed</th></tr></thead>
+        <tbody>${entries.length ? entries.map(e => `<tr>
+          <td class="num">${esc(auditTime(e.actedAt))}</td>
+          <td class="num">${esc(e.actedByName || e.actedBy)}</td>
+          <td><span class="chip ${AUDIT_ACTIONS[e.action] || "off"}">${esc(e.action)}</span></td>
+          <td class="num">${esc(e.table)}<div class="code">${esc(e.recordKey || "—")}</div></td>
+          <td class="wrap">${e.changedFields.length
+            ? e.changedFields.map(f => `<div><span class="num">${esc(f)}</span>:
+                ${esc(valueText(e.changes[f].old))} <b>&rarr;</b> ${esc(valueText(e.changes[f].new))}</div>`).join("")
+            : "—"}</td></tr>`).join("")
+          : `<tr><td colspan="5">Nothing recorded yet. Change a warehouse's capacity or edit a
+             day of the plan, then come back &mdash; this is where it lands.</td></tr>`}
+        </tbody></table></div>
+
+      <h2 style="margin:1.6rem 0 .7rem">What this does not cover</h2>
+      <p class="note" style="max-width:80ch">
+        Stated rather than left to be discovered. Somebody reading history and finding
+        nothing about a table needs to know whether nothing happened or nothing was
+        recorded, and those are very different answers to be guessing between.</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Not recorded</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td class="num">the log itself</td>
+              <td class="wrap">A trigger that logs its own writes does not terminate.</td></tr>
+          <tr><td class="num">stock balances</td>
+              <td class="wrap">Derived, never entered: every balance is the sum of posted
+                movements, and every movement is recorded. Logging it as well would double
+                the volume of the busiest table to record a number already recoverable, and
+                would bury the movements somebody is actually looking for.</td></tr>
+          <tr><td class="num">passwords</td>
+              <td class="wrap">Recorded as having changed, never as what they changed to.
+                That a password changed, by whom and when, is what the trail is for; the
+                value is not.</td></tr>
+        </tbody></table></div>`;
+
+  document.getElementById("au-table").addEventListener("change", e => {
+    renderAudit.table = e.target.value; route();
+  });
+  document.getElementById("au-actor").addEventListener("change", e => {
+    renderAudit.actor = e.target.value; route();
+  });
 }
 
 /* --- users ---------------------------------------------------------------- */
@@ -2838,7 +3022,8 @@ function route() {
 
   renderNav(page);
   ({ dashboard: renderDashboard, storage: renderStorage, movement: renderMovement,
-     actual: renderActual, ledger: renderLedger, plan: renderPlan, users: renderUsers }[page])();
+     actual: renderActual, ledger: renderLedger, plan: renderPlan,
+     audit: renderAudit, users: renderUsers }[page])();
   localise(document.getElementById("app"));
   save();
 }

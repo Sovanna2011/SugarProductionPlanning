@@ -95,8 +95,18 @@ So a body like
 { "storageCode": "FG-WH04", "createdBy": 999, "changedBy": 999 }
 ```
 
-does not have its audit fields stripped — it never had any. The two extra keys
-decode into nothing.
+is **refused**, not quietly cleaned up:
+
+```
+400  invalid request
+     json: unknown field "createdBy"
+```
+
+The decoder rejects unknown fields, and since no request type has an audit
+field, naming one is an unknown field. That is stronger than the requirement
+asks for — it permits ignoring — and it is the better behaviour: a client that
+believes it is setting the author gets told it is not, rather than watching its
+value disappear and assuming the server took it.
 
 A request with no identity at all is attributed to the **SYSTEM** account, not
 to a guess. SYSTEM is a real row in `app_users` with no password hash and an
@@ -192,7 +202,8 @@ having failed to load.
 ## These fields are not the audit log
 
 They answer *who last changed this, and when*. They do not answer *what
-changed*.
+changed*. That is `audit_logs`, and it is a different table for a different
+question.
 
 | | The four fields | The audit log |
 |---|---|---|
@@ -201,11 +212,99 @@ changed*.
 | Cost | four columns | a row per change |
 | Keeps | the current state of authorship | the history |
 
-A central audit log is **specified but not yet built** — it is the natural next
-piece of work, and it does not change anything on this page. What exists today
-gets you "ADMIN changed this warehouse's capacity on 9 August". What it does
-not get you is "from 20,000 t to 22,000 t", and for a capacity figure that
-somebody will eventually dispute, the second half is the half that matters.
+The four fields tell you *ADMIN changed this warehouse on 9 August*. The log
+tells you *from 20,000 t to 22,000 t*, and for a capacity figure somebody will
+eventually dispute, that is the half that settles it.
+
+See [the audit log](#the-audit-log) below.
+
+
+## The audit log
+
+`audit_logs` records one row per create, change or delete: which table, which
+record, which action, and every field that moved with its old and new value.
+
+```
+2026-08-09 01:50 · System Administrator · CHANGE · storage_locations FG-WH01
+    physical_capacity : 22,000 → 23,500
+```
+
+**A trigger writes it, not the application** — the same argument as for the four
+fields, with more force. An audit log the application maintains records exactly
+the writes the application remembered to record, which is the set of writes
+least likely to need auditing. `audit_log_change()` sees the `UPDATE` typed by
+hand to unstick a posting, the data fix run from a psql session, and the second
+application nobody mentioned.
+
+It diffs generically — `to_jsonb(OLD)` against `to_jsonb(NEW)` — so a table
+added next year is logged the day it is created rather than the day somebody
+remembers to add logging to it.
+
+### What it deliberately leaves out
+
+- **`changed_at`, `changed_by`, `created_at`, `created_by`, `version`.** They
+  move on every update, so including them would put pure noise on every row —
+  and the log already records who and when, in its own columns.
+- **A save that changed nothing.** No entry. An entry saying a record was
+  changed that cannot say how is worse than silence.
+- **Secrets.** `password_hash` and `token_hash` are recorded as having changed,
+  never as what they changed to:
+
+  ```json
+  { "password_hash": { "old": "(not recorded)", "new": "(not recorded)" } }
+  ```
+
+  Hashing a password in `app_users` achieves nothing if the hash is copied into
+  a table that gets exported to settle a capacity dispute. That a password was
+  changed, by whom and when, is what the trail is for; the value is not.
+
+### What it does not cover
+
+Three tables, each with its reason stored in `audit_log_exclusions` as a
+`NOT NULL` column with a minimum length — because an exclusion list is where an
+audit trail goes to die, and the cost of adding to it should be having to write
+down why.
+
+| Table | Why |
+|---|---|
+| `audit_logs` | A trigger that logs its own writes does not terminate. |
+| `audit_log_exclusions` | The same, and changes to it are visible by reading it. |
+| `inventory_balances` | Derived, never entered: every row is the sum of posted movements, and every movement is logged. Logging it too would double the volume of the busiest table to record a number already recoverable — and would bury the movements under the balance updates they caused. |
+
+The exclusions are served by `GET /api/v1/audit/exclusions` alongside the log
+itself, not left in a comment. Somebody reading history and finding nothing
+about a table needs to know whether nothing happened or nothing was recorded,
+and those are very different answers to be guessing between.
+
+### Reading it
+
+```
+GET /api/v1/audit/log
+GET /api/v1/audit/log?table=storage_locations&recordKey=FG-WH01
+GET /api/v1/audit/log?actedBy=23&from=2026-08-01T00:00:00Z
+GET /api/v1/audit/log?field=physical_capacity
+```
+
+Newest first, 200 by default and 1,000 at most. A default rather than
+unlimited: the log is the one table that only ever grows, and a screen asking
+for all of it works fine for a month and then stops working, at the point
+where somebody most needs it. Each filter has an index behind it.
+
+**Reading history needs the ADMIN role.** Not because the entries are secret —
+each is a change somebody made to shared operational data. Because of what they
+accumulate: read together they say when each person works, how fast, and what
+they get wrong. That is a picture of the staff rather than of the sugar, and it
+belongs with whoever is accountable for both. A person's own actions stay
+visible to them on the record they changed, in the Administrative Information
+panel.
+
+### Volume
+
+One row per change. The busiest writer is `inventory_movements`, which gains
+one log row per posting — the seeded opening position produces fourteen. The
+derived balance table, which would otherwise be the busiest of all, is
+excluded. If the log ever needs trimming, archive by `created_at`; nothing in
+the system reads it except the screens above.
 
 ## Where this applies
 
@@ -230,7 +329,7 @@ reader checking coverage should not have to guess.
 | `inventory_movements`, `inventory_balances` | same names |
 | `stock_transfers`, `stock_transfer_items` | `inventory_movements` with a transfer movement type |
 | `sales_dispatches`, `sales_dispatch_items` | `inventory_movements` with a sales movement type |
-| `audit_logs` | not yet built — see above |
+| `audit_logs` | `audit_logs`, plus `audit_log_exclusions` |
 | `system_parameters` | `system_parameters` |
 
 Tables that do not exist yet will carry the four fields when they are written,
@@ -248,4 +347,8 @@ go test -tags=integration ./internal/store/postgres/ -run Audit
 
 # That no request type anywhere accepts an actor from JSON.
 go test ./internal/httpapi/ -run Audit
+
+# The log: old and new values, secrets withheld, a hand-typed UPDATE caught,
+# a no-op save producing nothing, and the exclusions stated rather than found.
+go test -tags=integration ./internal/store/postgres/ -run "Recorded|Secret|Outside|Cover"
 ```

@@ -31,6 +31,19 @@ var routeRules = []rule{
 	// Administering the system, including other people's accounts.
 	{prefix: "/api/v1/admin/", roles: []string{auth.RoleAdmin}},
 
+	// Reading history is an administrator's job.
+	//
+	// Not because the log is secret — everything in it is a change somebody
+	// made to shared operational data, and hiding that would defeat the point
+	// of keeping it. Because of what it accumulates: read together, the
+	// entries say when each person works, how fast, and what they get wrong.
+	// That is a picture of the staff rather than of the sugar, and it belongs
+	// with whoever is accountable for both.
+	//
+	// A person's own actions are visible to them anyway, on the record they
+	// changed, in the Administrative Information panel.
+	{prefix: "/api/v1/audit/", roles: []string{auth.RoleAdmin}},
+
 	// Master data and the plan are the planner's to maintain.
 	{method: http.MethodPost, prefix: "/api/v1/master/", roles: []string{auth.RoleAdmin, auth.RolePlanner}},
 	{method: http.MethodPut, prefix: "/api/v1/master/", roles: []string{auth.RoleAdmin, auth.RolePlanner}},
